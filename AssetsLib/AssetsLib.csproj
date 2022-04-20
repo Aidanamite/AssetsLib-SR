@@ -97,6 +97,10 @@
       <HintPath>D:\Steam\steamapps\common\Slime Rancher\SlimeRancher_Data\Managed\SRML.Editor.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="System.Json">
+      <HintPath>.\System.Json.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="Unity.TextMeshPro, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>D:\Steam\steamapps\common\Slime Rancher\SlimeRancher_Data\Managed\Unity.TextMeshPro.dll</HintPath>
@@ -149,6 +153,9 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="modinfo.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="System.Json.dll" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

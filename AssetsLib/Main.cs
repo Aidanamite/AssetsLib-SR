@@ -10,6 +10,8 @@ using System.Linq;
 using SRML.SR;
 using SRML.SR.Translation;
 using TMPro;
+using System.Json;
+using MonomiPark.SlimeRancher.Regions;
 using Console = SRML.Console.Console;
 using Object = UnityEngine.Object;
 using Random = UnityEngine.Random;
@@ -21,6 +23,34 @@ namespace AssetsLib
         internal static Assembly modAssembly = Assembly.GetExecutingAssembly();
         internal static string modName = $"{modAssembly.GetName().Name}";
         internal static string modDir = $"{Environment.CurrentDirectory}\\SRML\\Mods\\{modName}";
+        internal static List<Assembly> libAssemblies = new List<Assembly>();
+
+        static Main()
+        {
+            foreach (var file in modAssembly.GetManifestResourceNames())
+                if (file.ToLower().EndsWith(".dll"))
+                {
+                    try
+                    {
+                        var stream = modAssembly.GetManifestResourceStream(file);
+                        var bytes = new byte[stream.Length];
+                        stream.Read(bytes, 0, bytes.Length);
+                        libAssemblies.Add(Assembly.Load(bytes));
+                    }
+                    catch (Exception e)
+                    {
+                        // Log("An error occured loading a resource assembly: " + e);
+                    }
+                }
+            AppDomain.CurrentDomain.AssemblyResolve += (x, y) =>
+            {
+                var name = new AssemblyName(y.Name).Name;
+                foreach (var lA in libAssemblies)
+                    if (lA.GetName().Name == name)
+                        return lA;
+                return null;
+            };
+        }
         static DroneUIProgramPicker _uiPre;
         internal static DroneUIProgramPicker uiPrefab
         {
@@ -84,11 +114,11 @@ namespace AssetsLib
     public static class MeshUtils
     {
         /// <summary>
-        /// <para>Creates a <see cref="Mesh"/> using the provided vertex, uv and triangle data. For each item in the <paramref name="modifiers"/> a duplicate of the mesh, depicted by the
-        /// data provided, is created, applying the respective modifier to the vertices of the duplicate.</para>
+        /// <para>Creates a <see cref="Mesh"/> using the provided vertex, uv and triangle data. For each item in the <paramref name="modifiers"/> a duplicate of the<br/>
+        /// mesh, depicted by the data provided, is created, applying the respective modifier to the vertices of the duplicate.</para>
         /// <para>This is designed to be used for generating a single <see cref="Mesh"/> that is made up of several duplicates of another mesh.</para>
-        /// <para>Throws an <see cref="ArgumentException"/> if the length of the <paramref name="vertices"/> is different to the length of the <paramref name="uv"/></para>
-        /// <para>Throws an <see cref="IndexOutOfRangeException"/> if one of the triangle indices is outside the <paramref name="vertices"/> array</para>
+        /// <para>Throws an <see cref="ArgumentException"/> if the length of the <paramref name="vertices"/> is different to the length of the <paramref name="uv"/>.<br/>
+        /// Throws an <see cref="IndexOutOfRangeException"/> if one of the triangle indices is outside the <paramref name="vertices"/> array.</para>
         /// </summary>
         /// <returns>The generated <see cref="Mesh"/></returns>
         /// <param name="vertices">the array of vertices from the source mesh</param>
@@ -126,8 +156,8 @@ namespace AssetsLib
             return m;
         }
         /// <summary>
-        /// <para>Creates a <see cref="Mesh"/> using the provided <see cref="MeshData"/> object. For each item in the modifiers a duplicate of the mesh, depicted by the
-        /// data provided, is created, applying the respective modifier to the duplicate.</para>
+        /// <para>Creates a <see cref="Mesh"/> using the provided <see cref="MeshData"/> object. For each item in the modifiers a duplicate of the<br/>
+        /// mesh, depicted by the data provided, is created, applying the respective modifier to the duplicate.</para>
         /// <para>This is designed to be used for generating a single <see cref="Mesh"/> that is made up of several duplicates of another mesh.</para>
         /// </summary>
         /// <returns>The generated <see cref="Mesh"/></returns>
@@ -154,11 +184,11 @@ namespace AssetsLib
         }
 
         /// <summary>
-        /// <para>Creates a <see cref="Mesh"/> using the provided vertex, uv and triangle data. Points in the mesh that match
-        /// the <paramref name="removeAt"/> predicate will be removed, all other points will be modified by the specified modify function</para>
+        /// <para>Creates a <see cref="Mesh"/> using the provided vertex, uv and triangle data. Points in the mesh that match the<br/>
+        /// <paramref name="removeAt"/> predicate will be removed, all other points will be modified by the specified modify function</para>
         /// <para>This is designed to be used for tweaking a <see cref="Mesh"/></para>
-        /// <para>Throws an <see cref="ArgumentException"/> if the length of the <paramref name="vertices"/> is different to the length of the <paramref name="uv"/></para>
-        /// <para>Throws an <see cref="IndexOutOfRangeException"/> if one of the triangle indices is outside the <paramref name="vertices"/> array</para>
+        /// <para>Throws an <see cref="ArgumentException"/> if the length of the <paramref name="vertices"/> is different to the length of the <paramref name="uv"/>.<br/>
+        /// Throws an <see cref="IndexOutOfRangeException"/> if one of the triangle indices is outside the <paramref name="vertices"/> array.</para>
         /// </summary>
         /// <returns>The generated <see cref="Mesh"/></returns>
         /// <param name="vertices">the array of vertices from the source mesh</param>
@@ -213,8 +243,10 @@ namespace AssetsLib
 
         /// <summary>
         /// <para>Generates a basic set of bone data for provided <see cref="Mesh"/>es and <see cref="SlimeAppearanceObject"/>s</para>
-        /// <para>This is designed to be used for generating the bone weights and configuring the <see cref="SlimeAppearanceObject"/>s for a custom slime model</para>
-        /// <para>Note: this only works for <see cref="SlimeAppearanceObject"/>s that use a <see cref="SkinnedMeshRenderer"/>. <see cref="MeshFilter"/>s will not be affected</para>
+        /// <para>This is designed to be used for generating the bone weights and configuring the<br/>
+        /// <see cref="SlimeAppearanceObject"/>s for a custom slime model</para>
+        /// <para>Note: this only works for <see cref="SlimeAppearanceObject"/>s that use a <see cref="SkinnedMeshRenderer"/>.<br/>
+        /// <see cref="MeshFilter"/>s will not be affected</para>
         /// </summary>
         /// <param name="slimePrefab">the <see cref="SlimeAppearanceApplicator"/> from your slime prefab</param>
         /// <param name="bodyApp">the <see cref="SlimeAppearanceObject"/> of your slime's main body</param>
@@ -225,8 +257,10 @@ namespace AssetsLib
 
         /// <summary>
         /// <para>Generates a basic set of bone data for provided <see cref="Mesh"/>es and <see cref="SlimeAppearanceObject"/>s</para>
-        /// <para>This is designed to be used for generating the bone weights and configuring the <see cref="SlimeAppearanceObject"/>s for a custom slime model</para>
-        /// <para>Note: this only works for <see cref="SlimeAppearanceObject"/>s that use a <see cref="SkinnedMeshRenderer"/>. <see cref="MeshFilter"/>s will not be affected</para>
+        /// <para>This is designed to be used for generating the bone weights and configuring the<br/>
+        /// <see cref="SlimeAppearanceObject"/>s for a custom slime model</para>
+        /// <para>Note: this only works for <see cref="SlimeAppearanceObject"/>s that use a <see cref="SkinnedMeshRenderer"/>.<br/>
+        /// <see cref="MeshFilter"/>s will not be affected</para>
         /// </summary>
         /// <param name="slimePrefab">the <see cref="SlimeAppearanceApplicator"/> from your slime prefab</param>
         /// <param name="bodyApp">the <see cref="SlimeAppearanceObject"/> of your slime's main body</param>
@@ -237,8 +271,10 @@ namespace AssetsLib
 
         /// <summary>
         /// <para>Generates a basic set of bone data for provided <see cref="Mesh"/>es and <see cref="SlimeAppearanceObject"/>s</para>
-        /// <para>This is designed to be used for generating the bone weights and configuring the <see cref="SlimeAppearanceObject"/>s for a custom slime model</para>
-        /// <para>Note: this only works for <see cref="SlimeAppearanceObject"/>s that use a <see cref="SkinnedMeshRenderer"/>. <see cref="MeshFilter"/>s will not be affected</para>
+        /// <para>This is designed to be used for generating the bone weights and configuring the<br/>
+        /// <see cref="SlimeAppearanceObject"/>s for a custom slime model</para>
+        /// <para>Note: this only works for <see cref="SlimeAppearanceObject"/>s that use a <see cref="SkinnedMeshRenderer"/>.<br/>
+        /// <see cref="MeshFilter"/>s will not be affected</para>
         /// </summary>
         /// <param name="slimePrefab">the <see cref="SlimeAppearanceApplicator"/> from your slime prefab</param>
         /// <param name="appearance">the slime appearance of your slime, the first valid object is assumed to be the slime's body mesh</param>
@@ -261,8 +297,10 @@ namespace AssetsLib
 
         /// <summary>
         /// <para>Generates a basic set of bone data for provided <see cref="Mesh"/>es and <see cref="SlimeAppearanceObject"/>s</para>
-        /// <para>This is designed to be used for generating the bone weights and configuring the <see cref="SlimeAppearanceObject"/>s for a custom slime model</para>
-        /// <para>Note: this only works for <see cref="SlimeAppearanceObject"/>s that use a <see cref="SkinnedMeshRenderer"/>. <see cref="MeshFilter"/>s will not be affected</para>
+        /// <para>This is designed to be used for generating the bone weights and configuring the<br/>
+        /// <see cref="SlimeAppearanceObject"/>s for a custom slime model</para>
+        /// <para>Note: this only works for <see cref="SlimeAppearanceObject"/>s that use a <see cref="SkinnedMeshRenderer"/>.<br/>
+        /// <see cref="MeshFilter"/>s will not be affected</para>
         /// </summary>
         /// <param name="slimePrefab">the <see cref="SlimeAppearanceApplicator"/> from your slime prefab</param>
         /// <param name="bodyApp">the <see cref="SlimeAppearanceObject"/> of your slime's main body</param>
@@ -529,11 +567,11 @@ namespace AssetsLib
         }
 
         /// <summary>
-        /// <para>For use with the purchase UI</para>
+        /// Designed for use with a <see cref="PurchaseUI"/>
         /// </summary>
         /// <param name="ui">the <see cref="GameObject"/> of the UI</param>
         /// <param name="refresh">if <see langword="true"/>, the UI is refreshed on purchase. if <see langword="false"/> the UI is closed on purchase</param>
-        /// <param name="action">the code to run on purchase</param>
+        /// <param name="action">the code to run on successful purchase</param>
         /// <param name="cost">the amount of money required to purchase the item (takes the money away from the player on purchase)</param>
         public static void Purchase(GameObject ui, bool refresh, Action action, int cost)
         {
@@ -554,6 +592,13 @@ namespace AssetsLib
             }
         }
 
+        /// <summary>Creates a basic inventory UI</summary>
+        /// <param name="titleKey">the UI name key to display at the top of the UI</param>
+        /// <param name="titleIcon">the icon to show at the top of the UI</param>
+        /// <param name="options">the items to display in the ui</param>
+        /// <param name="closeMenuOnSelect">whether or not the UI should close upon selecting an option</param>
+        /// <param name="onClose">the code to be run when the UI is closed</param>
+        /// <returns>The <see cref="GameObject"/> of the opened ui</returns>
         public static GameObject CreateInventoryUI(string titleKey, Sprite titleIcon, IEnumerable<IInventoryItem> options, bool closeMenuOnSelect = false, Action onClose = null)
         {
             var ui = Object.Instantiate(Main.uiPrefab2);
@@ -598,10 +643,12 @@ namespace AssetsLib
         void RefreshEntry(GameObject gO);
     }
 
+    /// <summary>A basic inventory item that use the name and icon from an <see cref="Identifiable.Id"/></summary>
     public class IdentInventoryItem : IInventoryItem
     {
         Identifiable.Id id;
         int count;
+        Func<int> getCount;
         Func<bool> onClick;
         public IdentInventoryItem(Identifiable.Id Id, int Count, Func<bool> OnClick = null)
         {
@@ -609,9 +656,16 @@ namespace AssetsLib
             count = Count;
             onClick = OnClick;
         }
+        public IdentInventoryItem(Identifiable.Id Id, Func<int> Count, Func<bool> OnClick = null)
+        {
+            id = Id;
+            getCount = Count;
+            onClick = OnClick;
+        }
         bool IInventoryItem.OnClick() => onClick?.Invoke() ?? false;
         void IInventoryItem.RefreshEntry(GameObject gO)
         {
+            var count = getCount?.Invoke() ?? this.count;
             if (id == Identifiable.Id.NONE)
                 gO.transform.Find("Content/Name").GetComponent<TMP_Text>().text = GameContext.Instance.MessageDirector.Get("pedia", "t.locked");
             else
@@ -623,6 +677,7 @@ namespace AssetsLib
         }
     }
 
+    /// <summary>A generic custom inventory item</summary>
     public class GenericInventoryItem : IInventoryItem
     {
         string nameKey;
@@ -651,37 +706,27 @@ namespace AssetsLib
 
     public static class GameObjectUtils
     {
-        /// <summary>
-        /// <para>Finds an effect prefab given its <paramref name="name"/></para>
-        /// </summary>
+        /// <summary>Finds an effect prefab given its <paramref name="name"/></summary>
         /// <returns>The effect prefab</returns>
         /// <param name="name">the name of the effect prefab to search for</param>
         public static GameObject FindFX(string name) => SceneContext.Instance.fxPool.pooledObjects.Keys.First((x) => x.name == name);
 
-        /// <summary>
-        /// <para>Finds an effect prefab given a <see cref="Predicate{T}"/></para>
-        /// </summary>
+        /// <summary>Finds an effect prefab given a <see cref="Predicate{T}"/></summary>
         /// <returns>The effect prefab</returns>
         /// <param name="predicate">the predicate to search for a match for</param>
         public static GameObject FindFX(Predicate<GameObject> predicate) => SceneContext.Instance.fxPool.pooledObjects.Keys.First((x) => predicate(x));
 
-        /// <summary>
-        /// <para>Finds an object of type <typeparamref name="T"/> given its <paramref name="name"/></para>
-        /// </summary>
+        /// <summary>Finds an object of type <typeparamref name="T"/> given its <paramref name="name"/></summary>
         /// <returns>The first object found</returns>
         /// <param name="name">the name of the object to search for</param>
         public static T FindObjectByName<T>(string name) where T : Object => Resources.FindObjectsOfTypeAll<T>().FirstOrDefault((x) => x.name == name);
 
-        /// <summary>
-        /// <para>Finds multi objects of type <typeparamref name="T"/> given their <paramref name="names"/></para>
-        /// </summary>
+        /// <summary>Finds multi objects of type <typeparamref name="T"/> given their <paramref name="names"/></summary>
         /// <returns>An array of the first object found with each name</returns>
         /// <param name="names">the names of the objects to search for</param>
         public static T[] FindObjectsByNames<T>(params string[] names) where T : Object => FindObjectsByNames<T>((IEnumerable<string>)names);
 
-        /// <summary>
-        /// <para>Finds multi objects of type <typeparamref name="T"/> given their <paramref name="names"/></para>
-        /// </summary>
+        /// <summary>Finds multi objects of type <typeparamref name="T"/> given their <paramref name="names"/></summary>
         /// <returns>An array of the first object found with each name</returns>
         /// <param name="names">the names of the objects to search for</param>
         public static T[] FindObjectsByNames<T>(IEnumerable<string> names) where T : Object
@@ -707,23 +752,17 @@ namespace AssetsLib
             return os;
         }
 
-        /// <summary>
-        /// <para>Finds an object of type <typeparamref name="T"/> given a <see cref="Predicate{T}"/></para>
-        /// </summary>
+        /// <summary>Finds an object of type <typeparamref name="T"/> given a <see cref="Predicate{T}"/></summary>
         /// <returns>The first object found</returns>
         /// <param name="predicate">the predicate to search for a match for</param>
         public static T FindObject<T>(Predicate<T> predicate) where T : Object => Resources.FindObjectsOfTypeAll<T>().FirstOrDefault((x) => predicate(x));
 
-        /// <summary>
-        /// <para>Finds multi objects of type <typeparamref name="T"/> given a set of <see cref="Predicate{T}"/>s</para>
-        /// </summary>
+        /// <summary>Finds multi objects of type <typeparamref name="T"/> given a set of <see cref="Predicate{T}"/>s</summary>
         /// <returns>An array of the first object matching each <see cref="Predicate{T}"/></returns>
         /// <param name="predicates">the predicate to search for a match for</param>
         public static T[] FindObjects<T>(params Predicate<T>[] predicates) where T : Object => FindObjects((IEnumerable<Predicate<T>>)predicates);
 
-        /// <summary>
-        /// <para>Finds multi objects of type <typeparamref name="T"/> given a set of <see cref="Predicate{T}"/>s</para>
-        /// </summary>
+        /// <summary>Finds multi objects of type <typeparamref name="T"/> given a set of <see cref="Predicate{T}"/>s</summary>
         /// <returns>An array of the first object matching each <see cref="Predicate{T}"/></returns>
         /// <param name="predicates">the predicate to search for a match for</param>
         public static T[] FindObjects<T>(IEnumerable<Predicate<T>> predicates) where T : Object
@@ -750,9 +789,7 @@ namespace AssetsLib
         }
 
 
-        /// <summary>
-        /// <para>Creates a <see cref="SlimeAppearanceElement"/></para>
-        /// </summary>
+        /// <summary>Creates a <see cref="SlimeAppearanceElement"/></summary>
         /// <returns>The created element</returns>
         /// <param name="Name">The name to give the <see cref="SlimeAppearanceElement"/> (this is not important)</param>
         /// <param name="appearanceObjects">The <see cref="SlimeAppearanceObject"/> prefabs to store in the <see cref="SlimeAppearanceElement"/></param>
@@ -771,15 +808,11 @@ namespace AssetsLib
         /// <returns>The prefab of the <see cref="Identifiable.Id"/> from the <see cref="LookupDirector"/></returns>
         public static GameObject GetPrefab(this Identifiable.Id id) => GameContext.Instance.LookupDirector.GetPrefab(id);
 
-        /// <summary>
-        /// <para>Attepts to get a <see cref="Component"/> of type <typeparamref name="T"/>. If the <see cref="Component"/> was not present on the <see cref="GameObject"/> it is added.</para>
-        /// </summary>
+        /// <summary>Attepts to get a <see cref="Component"/> of type <typeparamref name="T"/>. If the <see cref="Component"/> was not present on the <see cref="GameObject"/> it is added.</summary>
         /// <returns>An instance of <typeparamref name="T"/></returns>
         public static T GetOrAddComponent<T>(this GameObject obj) where T : Component => obj.GetComponent<T>() ?? obj.AddComponent<T>();
 
-        /// <summary>
-        /// <para>Attepts to get a <see cref="Component"/> of type <typeparamref name="T"/>. If the <see cref="Component"/> was not present on the <see cref="GameObject"/> it is added.</para>
-        /// </summary>
+        /// <summary>Attepts to get a <see cref="Component"/> of type <typeparamref name="T"/>. If the <see cref="Component"/> was not present on the <see cref="GameObject"/> it is added.</summary>
         /// <returns>An instance of <typeparamref name="T"/></returns>
         public static T GetOrAddComponent<T>(this Component obj) where T : Component => obj.GetComponent<T>() ?? obj.gameObject.AddComponent<T>();
 
@@ -795,6 +828,7 @@ namespace AssetsLib
 
             return o;
         }
+
         /// <returns>Instantiates an inactive duplicate of the object</returns>
         public static GameObject CreateInactive(this GameObject obj)
         {
@@ -804,6 +838,10 @@ namespace AssetsLib
             return o;
         }
 
+        /// <summary>Useful for one-liner <see cref="ScriptableObject"/> creation.</summary>
+        /// <typeparam name="T">the class to create an instance of</typeparam>
+        /// <param name="construct">after creation, the created object will be given to this function. Use this to set variables on the object</param>
+        /// <returns>The created object</returns>
         public static T CreateScriptableObject<T>(Action<T> construct = null) where T : ScriptableObject
         {
             var o = ScriptableObject.CreateInstance<T>();
@@ -812,12 +850,198 @@ namespace AssetsLib
         }
     }
 
+    public static class TextUtils
+    {
+        /// <summary>
+        /// <para>Loads a text file from the embedded resources.</para>
+        /// <para>Throws a <see cref="MissingResourceException"/> if no file is found under the specified name.</para>
+        /// </summary>
+        /// <param name="filename">the name of the file to load (including extention)</param>
+        /// <param name="encoding">The character encoding to read the file with</param>
+        /// <returns>The contents of the file</returns>
+        /// <exception cref="MissingResourceException"/>
+        public static string LoadText(string filename, System.Text.Encoding encoding = default)
+        {
+            if (encoding == default)
+                encoding = System.Text.Encoding.Default;
+            var modAssembly = Assembly.GetCallingAssembly();
+            filename = modAssembly.GetName().Name + "." + filename;
+            var stream = modAssembly.GetManifestResourceStream(filename);
+            if (stream == null)
+                throw new MissingResourceException(filename);
+            var bytes = new byte[stream.Length];
+            stream.Read(bytes, 0, bytes.Length);
+            return encoding.GetString(bytes);
+        }
+        /// <summary>
+        /// <para>Loads a json file from the embedded resources.</para>
+        /// <para>Throws a <see cref="MissingResourceException"/> if no file is found under the specified name.</para>
+        /// </summary>
+        /// <param name="filename">the name of the file to load (including extention)</param>
+        /// <returns>The <see cref="JsonValue"/> generated from the file's contents. In most cases this will be a <see cref="JsonObject"/></returns>
+        /// <exception cref="MissingResourceException"/>
+        public static JsonValue LoadJson(string filename)
+        {
+            var modAssembly = Assembly.GetCallingAssembly();
+            filename = modAssembly.GetName().Name + "." + filename;
+            var stream = modAssembly.GetManifestResourceStream(filename);
+            if (stream == null)
+                throw new MissingResourceException(filename);
+            return JsonValue.Load(stream);
+        }
+        /// <summary>Creates a <see cref="JsonValue"/> from a raw json <see cref="string"/></summary>
+        /// <param name="rawJson">the <see cref="string"/> to create the <see cref="JsonValue"/> from</param>
+        /// <returns>The <see cref="JsonValue"/> generated from <paramref name="rawJson"/>. In most cases this will be a <see cref="JsonObject"/></returns>
+        public static JsonValue LoadRawJson(string rawJson) => JsonValue.Parse(rawJson);
+    }
+
+    public static class DroneNetworkUtils
+    {
+        /// <summary>
+        /// <para>Creates a set of <see cref="PathingNetworkNode"/>s as depicted by the provided <see cref="JsonObject"/> and adds them<br/>
+        /// to the provided cell. During this process, if the provided cell does not already contain a<br/>
+        /// <see cref="DroneNetwork"/> component, one will be added.</para>
+        /// <para>If the cell already has a <see cref="DroneNetwork"/>, existing nodes will not be removed</para>
+        /// <para>Throws a <see cref="FormatException"/> if one of the json elements is the wrong type.<br/>
+        /// Throws a <see cref="MissingMemberException"/> if one of the json elements is missing a required property.</para>
+        /// </summary>
+        /// <param name="cell">The <see cref="CellDirector"/> of the cell to add the nodes to</param>
+        /// <param name="json">The JSON to generate the nodes from</param>
+        /// <param name="automatic2WayConnections">If <see langword="true"/>, all the node connections created will have a second reverse connection.<br/><see cref="Drone"/>s may not path as expected if connections are only one way</param>
+        /// <returns>The longest created connection length. If the distance between nodes is too great, drones may<br/>be unable to use the connection</returns>
+        /// <exception cref="FormatException"/>
+        /// <exception cref="MissingMemberException"/>
+        public static float CreateNodesFromJson(CellDirector cell, JsonObject json, bool automatic2WayConnections = true)
+        {
+            var flag = false;
+            var network = cell.GetComponent<DroneNetwork>();
+            if (!network)
+            {
+                flag = true;
+                if (cell.gameObject.activeSelf)
+                    Patch_PathingNetwork.prevent = true;
+                network = cell.gameObject.AddComponent<DroneNetwork>();
+                Patch_PathingNetwork.prevent = false;
+            }
+            if (network.nodesParent == null)
+            {
+                network.nodesParent = new GameObject("droneNodeParent");
+                network.nodesParent.transform.SetParent(cell.GetComponent<Region>().root.transform, false);
+            }
+            var parent = network.nodesParent.transform;
+            var pather = network.Pather;
+            var nodes = pather.nodes.ToList();
+            var nodeMem = new Dictionary<PathingNetworkNode, List<object>>();
+            try
+            {
+                foreach (var p in json)
+                {
+                    if (p.Value.JsonType != JsonType.Object)
+                        throw new FormatException($"Element {p.Key} is {p.Value.JsonType}. Expected: {JsonType.Object}");
+                    if (!p.Value.ContainsKey("position"))
+                        throw new MissingMemberException($"Element {p.Key} is missing the \"position\" property");
+                    var posJson = p.Value["position"];
+                    if (posJson.JsonType != JsonType.Array)
+                        throw new FormatException($"Element {p.Key}.position is {posJson.JsonType}. Expected: {JsonType.Array}");
+                    if (posJson.Count != 3)
+                        throw new FormatException($"Element {p.Key}.position has length {posJson.Count}. Expected: 3");
+                    for (int i = 0; i < 3; i++)
+                        if (posJson[i].JsonType != JsonType.Number)
+                            throw new FormatException($"Element {p.Key}.position[{i}] is {posJson[i].JsonType}. Expected: {JsonType.Number}");
+                    var pos = new Vector3(posJson[0], posJson[1], posJson[2]);
+                    var mem = new List<object>();
+                    if (!p.Value.ContainsKey("connections"))
+                        throw new MissingMemberException($"Element {p.Key} is missing the \"connections\" property");
+                    var connectJson = p.Value["connections"];
+                    if (connectJson.JsonType != JsonType.Array)
+                        throw new FormatException($"Element {p.Key}.connections is {connectJson.JsonType}. Expected: {JsonType.Array}");
+                    int j = 0;
+                    foreach (var c in (JsonArray)connectJson)
+                    {
+                        if (c.JsonType == JsonType.Number)
+                            mem.Add((int)c);
+                        else if (c.JsonType == JsonType.String)
+                            mem.Add((string)c);
+                        else
+                            throw new FormatException($"Element {p.Key}.connections[{j}] is {connectJson.JsonType}. Expected: {JsonType.Number} or {JsonType.String}");
+                        j++;
+                    }
+                    var n = new GameObject(p.Key).AddComponent<PathingNetworkNode>();
+                    nodes.Add(n);
+                    n.transform.SetParent(parent, false);
+                    n.transform.position = pos;
+                    nodeMem.Add(n, mem);
+                    n.nodeLoc = n.transform;
+                }
+            }
+            catch (Exception e)
+            {
+                foreach (var n in nodeMem.Keys)
+                    Object.DestroyImmediate(n.gameObject);
+                if (flag)
+                {
+                    Patch_PathingNetwork.prevent = false;
+                    Object.DestroyImmediate(network);
+                }
+                throw e;
+            }
+            pather.nodes = nodes.ToArray();
+            float max = 0;
+            foreach (var p in nodeMem)
+                foreach (var o in p.Value)
+                    if (o is string)
+                    {
+                        var f = nodes.FirstOrDefault((x) => x.name == (string)o);
+                        if (f == null)
+                            Debug.LogWarning("Node " + o + " was not found. Connection not created");
+                        else
+                        {
+                            if (p.Key.connections == null)
+                                p.Key.connections = new List<PathingNetworkNode>();
+                            if (!p.Key.connections.Contains(f))
+                                p.Key.connections.Add(f);
+                            if (automatic2WayConnections)
+                            {
+                                if (f.connections == null)
+                                    f.connections = new List<PathingNetworkNode>();
+                                if (!f.connections.Contains(p.Key))
+                                    f.connections.Add(p.Key);
+                            }
+                            max = Mathf.Max(max, (p.Key.position - f.position).sqrMagnitude);
+                        }
+                    }
+                    else
+                    {
+                        if ((int)o < 0)
+                            Debug.LogWarning("Node index " + o + " was less than 0. Connection not created");
+                        else if ((int)o >= nodes.Count)
+                            Debug.LogWarning("Node index " + o + " was greater than " + (nodes.Count - 1) + ". Connection not created");
+                        else
+                        {
+                            if (p.Key.connections == null)
+                                p.Key.connections = new List<PathingNetworkNode>();
+                            var f = nodes[(int)o];
+                            if (!p.Key.connections.Contains(f))
+                                p.Key.connections.Add(f);
+                            if (automatic2WayConnections)
+                            {
+                                if (f.connections == null)
+                                    f.connections = new List<PathingNetworkNode>();
+                                if (!f.connections.Contains(p.Key))
+                                    f.connections.Add(p.Key);
+                            }
+                            max = Mathf.Max(max, (p.Key.position - f.position).sqrMagnitude);
+                        }
+                    }
+            return Mathf.Sqrt(max);
+        }
+    }
+
     public static class ExtentionMethods
     {
 
-        /// <summary>
-        /// <para>Searches for an item matching the provided <see cref="Predicate{T}"/>. Starts searching at <paramref name="start"/>. if no matching value is found after <paramref name="start"/> then it will search from the first item up to <paramref name="start"/></para>
-        /// </summary>
+        /// <summary>Searches for an item matching the provided <see cref="Predicate{T}"/>. Starts searching at <paramref name="start"/>.<br/>
+        /// If no matching value is found after <paramref name="start"/> then it will search from the first item up to <paramref name="start"/></summary>
         /// <returns>The index of the found item. If no item was found returns -1</returns>
         /// <param name="start">the index to start the search at</param>
         /// <param name="predicate">the condition to search for</param>
@@ -835,7 +1059,8 @@ namespace AssetsLib
 
         /// <summary>
         /// <para>Gets the item from the list at index <paramref name="index"/>.</para>
-        /// <para>If index is outside the bounds of the list then it will be wrapped to the list's length. For example, -1 will be the last item in the list</para>
+        /// <para>If index is outside the bounds of the list then it will be wrapped to the list's<br/>
+        /// length. For example, -1 will be the last item in the list</para>
         /// </summary>
         /// <returns>The item at the specified index</returns>
         /// <param name="index">the index of the item to fetch</param>
@@ -848,7 +1073,8 @@ namespace AssetsLib
 
 
         /// <summary>
-        /// <para>Attempts to find an item within a list. If the item is found its index is returned, otherwise the item is added to the list and the new item's index is returned</para>
+        /// <para>Attempts to find an item within a list. If the item is found its index is returned, otherwise<br/>
+        /// the item is added to the list and the new item's index is returned</para>
         /// </summary>
         /// <returns>The index of the specified item</returns>
         /// <param name="value">the value to get the index of</param>
@@ -863,9 +1089,7 @@ namespace AssetsLib
             return i;
         }
 
-        /// <summary>
-        /// <para>Recursively searchs all the children of the <see cref="Transform"/> to find all that have a certain name</para>
-        /// </summary>
+        /// <summary>Recursively searchs all the children of the <see cref="Transform"/> to find all that have a certain name</summary>
         /// <returns>A list of the found children's <see cref="Transform"/>s</returns>
         /// <param name="ChildName">the name of the children to search for</param>
         public static List<Transform> FindChildrenRecursively(this Transform transform, string ChildName)
@@ -883,104 +1107,64 @@ namespace AssetsLib
                 t.GetChildren_Internal(ChildName, transforms);
         }
 
-        /// <summary>
-        /// <para>Adds an id to the <see cref="SlimeEat.FoodGroup"/></para>
-        /// </summary>
+        /// <summary>Adds an id to the <see cref="SlimeEat.FoodGroup"/></summary>
         public static void AddItem(this SlimeEat.FoodGroup foodGroup, Identifiable.Id ident) => SlimeEat.foodGroupIds[foodGroup] = SlimeEat.foodGroupIds.TryGetValue(foodGroup, out var v) ? v.AddToArray(ident) : new Identifiable.Id[] { ident };
 
-        /// <summary>
-        /// <para>Rotates a <see cref="Vector3"/> by the provided <see cref="Quaternion"/></para>
-        /// </summary>
+        /// <summary>Rotates a <see cref="Vector3"/> by the provided <see cref="Quaternion"/></summary>
         /// <returns>The rotated <see cref="Vector3"/></returns>
         public static Vector3 Rotate(this Vector3 value, Quaternion rotation) => rotation * value;
-        /// <summary>
-        /// <para>Rotates a <see cref="Vector3"/> by the provided Euler</para>
-        /// </summary>
+        /// <summary>Rotates a <see cref="Vector3"/> by the provided Euler</summary>
         /// <returns>The rotated <see cref="Vector3"/></returns>
         public static Vector3 Rotate(this Vector3 value, Vector3 rotation) => value.Rotate(Quaternion.Euler(rotation));
-        /// <summary>
-        /// <para>Rotates a <see cref="Vector3"/> by the provided Euler</para>
-        /// </summary>
+        /// <summary>Rotates a <see cref="Vector3"/> by the provided Euler</summary>
         /// <returns>The rotated <see cref="Vector3"/></returns>
         public static Vector3 Rotate(this Vector3 value, float x, float y, float z) => value.Rotate(Quaternion.Euler(x, y, z));
-        /// <summary>
-        /// <para>Rotates a <see cref="Vector3"/> by the provided <see cref="Quaternion"/> around the specified point</para>
-        /// </summary>
+        /// <summary>Rotates a <see cref="Vector3"/> by the provided <see cref="Quaternion"/> around the specified point</summary>
         /// <returns>The rotated <see cref="Vector3"/></returns>
         public static Vector3 Rotate(this Vector3 value, Quaternion rotation, Vector3 rotatePoint) => value.Offset(-rotatePoint).Rotate(rotation).Offset(rotatePoint);
-        /// <summary>
-        /// <para>Rotates a <see cref="Vector3"/> by the provided Euler around the specified point</para>
-        /// </summary>
+        /// <summary>Rotates a <see cref="Vector3"/> by the provided Euler around the specified point</summary>
         /// <returns>The rotated <see cref="Vector3"/></returns>
         public static Vector3 Rotate(this Vector3 value, Vector3 rotation, Vector3 rotatePoint) => value.Rotate(Quaternion.Euler(rotation), rotatePoint);
-        /// <summary>
-        /// <para>Rotates a <see cref="Vector3"/> by the provided Euler around the specified point</para>
-        /// </summary>
+        /// <summary>Rotates a <see cref="Vector3"/> by the provided Euler around the specified point</summary>
         /// <returns>The rotated <see cref="Vector3"/></returns>
         public static Vector3 Rotate(this Vector3 value, float x, float y, float z, Vector3 rotatePoint) => value.Rotate(Quaternion.Euler(x, y, z), rotatePoint);
-        /// <summary>
-        /// <para>Rotates a <see cref="Vector3"/> by the provided <see cref="Quaternion"/> around the specified point</para>
-        /// </summary>
+        /// <summary>Rotates a <see cref="Vector3"/> by the provided <see cref="Quaternion"/> around the specified point</summary>
         /// <returns>The rotated <see cref="Vector3"/></returns>
         public static Vector3 Rotate(this Vector3 value, Quaternion rotation, float rotatePointX, float rotatePointY, float rotatePointZ) => value.Rotate(rotation, new Vector3(rotatePointX, rotatePointY, rotatePointZ));
-        /// <summary>
-        /// <para>Rotates a <see cref="Vector3"/> by the provided Euler around the specified point</para>
-        /// </summary>
+        /// <summary>Rotates a <see cref="Vector3"/> by the provided Euler around the specified point</summary>
         /// <returns>The rotated <see cref="Vector3"/></returns>
         public static Vector3 Rotate(this Vector3 value, Vector3 rotation, float rotatePointX, float rotatePointY, float rotatePointZ) => value.Rotate(Quaternion.Euler(rotation), new Vector3(rotatePointX, rotatePointY, rotatePointZ));
-        /// <summary>
-        /// <para>Rotates a <see cref="Vector3"/> by the provided Euler around the specified point</para>
-        /// </summary>
+        /// <summary>Rotates a <see cref="Vector3"/> by the provided Euler around the specified point</summary>
         /// <returns>The rotated <see cref="Vector3"/></returns>
         public static Vector3 Rotate(this Vector3 value, float x, float y, float z, float rotatePointX, float rotatePointY, float rotatePointZ) => value.Rotate(Quaternion.Euler(x, y, z), new Vector3(rotatePointX, rotatePointY, rotatePointZ));
-        /// <summary>
-        /// <para>Offsets a <see cref="Vector3"/> by the provided <see cref="Vector3"/></para>
-        /// </summary>
+        /// <summary>Offsets a <see cref="Vector3"/> by the provided <see cref="Vector3"/></summary>
         /// <returns>The offset <see cref="Vector3"/></returns>
         public static Vector3 Offset(this Vector3 value, float x, float y, float z) => value.Offset(new Vector3(x, y, z));
-        /// <summary>
-        /// <para>Offsets a <see cref="Vector3"/> by the provided <see cref="Vector3"/></para>
-        /// </summary>
+        /// <summary>Offsets a <see cref="Vector3"/> by the provided <see cref="Vector3"/></summary>
         /// <returns>The offset <see cref="Vector3"/></returns>
         public static Vector3 Offset(this Vector3 value, Vector3 offset) => value + offset;
-        /// <summary>
-        /// <para>Multiplies a <see cref="Vector3"/> by the provided <see cref="Vector3"/></para>
-        /// </summary>
+        /// <summary>Multiplies a <see cref="Vector3"/> by the provided <see cref="Vector3"/></summary>
         /// <returns>The scaled <see cref="Vector3"/></returns>
         public static Vector3 Multiply(this Vector3 value, float x, float y, float z) => new Vector3(value.x * x, value.y * y, value.z * z);
-        /// <summary>
-        /// <para>Multiplies a <see cref="Vector3"/> by the provided <see cref="Vector3"/></para>
-        /// </summary>
+        /// <summary>Multiplies a <see cref="Vector3"/> by the provided <see cref="Vector3"/></summary>
         /// <returns>The scaled <see cref="Vector3"/></returns>
         public static Vector3 Multiply(this Vector3 value, float scale) => value.Multiply(scale, scale, scale);
-        /// <summary>
-        /// <para>Multiplies a <see cref="Vector3"/> by the provided <see cref="Vector3"/></para>
-        /// </summary>
+        /// <summary>Multiplies a <see cref="Vector3"/> by the provided <see cref="Vector3"/></summary>
         /// <returns>The scaled <see cref="Vector3"/></returns>
         public static Vector3 Multiply(this Vector3 value, Vector3 scale) => value.Multiply(scale.x, scale.y, scale.z);
-        /// <summary>
-        /// <para>Multiplies a <see cref="Vector2"/> by the provided <see cref="Vector2"/></para>
-        /// </summary>
+        /// <summary>Multiplies a <see cref="Vector2"/> by the provided <see cref="Vector2"/></summary>
         /// <returns>The scaled <see cref="Vector2"/></returns>
         public static Vector2 Multiply(this Vector2 value, float x, float y) => new Vector2(value.x * x, value.y * y);
-        /// <summary>
-        /// <para>Multiplies a <see cref="Vector2"/> by the provided <see cref="Vector2"/></para>
-        /// </summary>
+        /// <summary>Multiplies a <see cref="Vector2"/> by the provided <see cref="Vector2"/></summary>
         /// <returns>The scaled <see cref="Vector2"/></returns>
         public static Vector2 Multiply(this Vector2 value, Vector2 scale) => value.Multiply(scale.x, scale.y);
-        /// <summary>
-        /// <para>Offsets a <see cref="Vector2"/> by the provided <see cref="Vector2"/></para>
-        /// </summary>
+        /// <summary>Offsets a <see cref="Vector2"/> by the provided <see cref="Vector2"/></summary>
         /// <returns>The offset <see cref="Vector2"/></returns>
         public static Vector2 Offset(this Vector2 value, float x, float y) => value.Offset(new Vector2(x, y));
-        /// <summary>
-        /// <para>Offsets a <see cref="Vector2"/> by the provided <see cref="Vector2"/></para>
-        /// </summary>
+        /// <summary>Offsets a <see cref="Vector2"/> by the provided <see cref="Vector2"/></summary>
         /// <returns>The offset <see cref="Vector2"/></returns>
         public static Vector2 Offset(this Vector2 value, Vector2 offset) => value + offset;
-        /// <summary>
-        /// <para>Rotates a <see cref="Vector2"/> by the provided angle in degrees</para>
-        /// </summary>
+        /// <summary>Rotates a <see cref="Vector2"/> by the provided angle in degrees</summary>
         /// <returns>The rotated <see cref="Vector2"/></returns>
         public static Vector2 Rotate(this Vector2 value, float angle)
         {
@@ -990,14 +1174,10 @@ namespace AssetsLib
                 a += Mathf.PI;
             return new Vector2(Mathf.Sin(a) * l, Mathf.Cos(a) * l);
         }
-        /// <summary>
-        /// <para>Rotates a <see cref="Vector2"/> by the provided angle in degrees around the provided point</para>
-        /// </summary>
+        /// <summary>Rotates a <see cref="Vector2"/> by the provided angle in degrees around the provided point</summary>
         /// <returns>The rotated <see cref="Vector2"/></returns>
         public static Vector2 Rotate(this Vector2 value, float angle, Vector2 rotatePoint) => value.Offset(-rotatePoint).Rotate(angle).Offset(rotatePoint);
-        /// <summary>
-        /// <para>Rotates a <see cref="Vector2"/> by the provided angle in degrees around the provided point</para>
-        /// </summary>
+        /// <summary>Rotates a <see cref="Vector2"/> by the provided angle in degrees around the provided point</summary>
         /// <returns>The rotated <see cref="Vector2"/></returns>
         public static Vector2 Rotate(this Vector2 value, float angle, float x, float y) => value.Rotate(angle, new Vector2(x, y));
         /// <returns>The <see cref="Vector3"/>'s x, y and z values in an array</returns>
@@ -1018,9 +1198,7 @@ namespace AssetsLib
         }
 
 
-        /// <summary>
-        /// <para>Copies all the field's values from <paramref name="b"/>.</para>
-        /// </summary>
+        /// <summary>Copies all the field's values from <paramref name="b"/>.</summary>
         public static void CopyFields<T>(this T a, T b)
         {
             var t = typeof(T);
@@ -1033,32 +1211,20 @@ namespace AssetsLib
             }
         }
 
-        /// <summary>
-        /// Overlays the <see cref="Color"/> with <paramref name="color"/> with respect to alpha values
-        /// </summary>
-        /// <param name="c"></param>
-        /// <param name="color"></param>
-        /// <returns></returns>
+        /// <summary>Overlays the <see cref="Color"/> with <paramref name="color"/> with respect to alpha values</summary>
         public static Color Overlay(this Color c, Color color) => new Color(c.r * (1 - color.a) + color.r * color.a, c.g * (1 - color.a) + color.g * color.a, c.b * (1 - color.a) + color.b * color.a, Mathf.Max(c.a, color.a));
 
         public static Color Multiply(this Color color, float r, float g, float b) => new Color(color.r * r, color.g * g, color.b * b, color.a);
         public static Color Multiply(this Color color, float m) => new Color(color.r * m, color.g * m, color.b * m, color.a);
 
         /// <summary>Returns the <see cref="Color"/> grayscaled then tinted</summary>
-        /// <param name="color"></param>
-        /// <param name="r"></param>
-        /// <param name="g"></param>
-        /// <param name="b"></param>
-        /// <returns></returns>
         public static Color Shift(this Color color, float r, float g, float b)
         {
             var v = color.grayscale;
             return new Color(v * r, v * g, v * b, color.a);
         }
 
-        /// <summary>
-        /// <para>Selects a random object from a collection given the weights fetched from the <paramref name="getWeight"/> function</para>
-        /// </summary>
+        /// <summary>Selects a random object from a collection given the weights fetched from the <paramref name="getWeight"/> function</summary>
         /// <returns>A random object</returns>
         public static T RandomObject<T>(this IEnumerable<T> c, Func<T, float> getWeight)
         {
@@ -1141,9 +1307,7 @@ namespace AssetsLib
         List<Color> colors = new List<Color>();
         List<float> positions = new List<float>();
 
-        /// <summary>
-        /// <para>Adds a <see cref="Color"/> to the <see cref="ColorGroup"/> at the specified position</para>
-        /// </summary>
+        /// <summary>Adds a <see cref="Color"/> to the <see cref="ColorGroup"/> at the specified position</summary>
         public void AddColor(Color color, float position)
         {
             position = Mathf.Clamp01(position);
@@ -1417,5 +1581,12 @@ namespace AssetsLib
             var bu = b.uvs;
             return new MeshModifier((x) => bv(av(x)), (x) => bu(au(x)));
         }
+    }
+
+    [HarmonyPatch(typeof(PathingNetwork), "Awake")]
+    class Patch_PathingNetwork
+    {
+        public static bool prevent = false;
+        static bool Prefix() => !prevent;
     }
 }
