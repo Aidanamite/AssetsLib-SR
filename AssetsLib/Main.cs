@@ -2,6 +2,7 @@
 using SRML;
 using SRML.Console;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
@@ -50,6 +51,7 @@ namespace AssetsLib
                         return lA;
                 return null;
             };
+            new Harmony("com.aidanamite.AssetsLib").PatchAll();
         }
         static DroneUIProgramPicker _uiPre;
         internal static DroneUIProgramPicker uiPrefab
@@ -98,6 +100,43 @@ namespace AssetsLib
                 if (!_buttonPre2)
                     _ = uiPrefab2;
                 return _buttonPre2;
+            }
+        }
+        static InformationUI _uiPre3;
+        internal static InformationUI uiPrefab3
+        {
+            get
+            {
+                if (!_uiPre3)
+                {
+                    var ui = Resources.FindObjectsOfTypeAll<PediaUI>().First((x) => !x.name.EndsWith("(Clone)"));
+                    var ui3 = ui.CreatePrefab();
+                    ui3.gameObject.name = "InformationUI";
+                    _uiPre3 = ui3.gameObject.AddComponent<InformationUI>();
+                    _uiPre3.CopyFields<BaseUI>(ui3);
+                    _uiPre3.listingScroller = ui3.listingScroller;
+                    _uiPre3.listingPanel = ui3.listingPanel;
+                    _uiPre3.descScroller = ui3.descScroller;
+                    _uiPre3.titleText = ui3.titleText;
+                    _uiPre3.introText = ui3.introText;
+                    _uiPre3.image = ui3.image;
+                    _uiPre3.descPanel = ui3.ranchDescPanel;
+                    foreach (Transform t in _uiPre3.descPanel.GetAllChildren())
+                        Object.DestroyImmediate(t.gameObject);
+                    _uiPre3.tabs = ui3.tabs;
+                    _uiPre3.tabPrefab = (SRToggle)ui3.ranchTab.CreatePrefab();
+                    _uiPre3.tabPrefab.name = "TabButton";
+                    _uiPre3.tabPrefab.transform.Find("Text").GetComponent<TMP_Text>().text = "ᓚᘏᗢ";
+                    foreach (Transform t in _uiPre3.tabs.transform.GetAllChildren())
+                        Object.DestroyImmediate(t.gameObject);
+                    _uiPre3.uiHeader = _uiPre3.transform.Find("UIContainer/MainPanel/TitleImage").GetComponent<Image>();
+                    _uiPre3.closeButton = _uiPre3.transform.Find("UIContainer/MainPanel/CloseButton").GetComponent<Button>();
+                    foreach (Transform t in _uiPre3.descPanel.parent.GetAllChildren())
+                        if (t != _uiPre3.descPanel)
+                            Object.DestroyImmediate(t.gameObject);
+                    Object.DestroyImmediate(ui3);
+                }
+                return _uiPre3;
             }
         }
         internal static Transform prefabParent;
@@ -252,6 +291,19 @@ namespace AssetsLib
         /// <param name="bodyApp">the <see cref="SlimeAppearanceObject"/> of your slime's main body</param>
         /// <param name="jiggleAmount">the amount the model will be affected by the slime's movement</param>
         /// <param name="scale">the scale to put the model to. This is handy due to model's scale being unaffected by <see cref="Transform.localScale"/></param>
+        public static void GenerateBoneData(SlimeAppearanceApplicator slimePrefab, SlimeAppearanceObject bodyApp, float jiggleAmount = 1, float scale = 1) => GenerateBoneData(slimePrefab, bodyApp, jiggleAmount, scale, appearanceObjects: null, AdditionalMesh: null);
+
+        /// <summary>
+        /// <para>Generates a basic set of bone data for provided <see cref="Mesh"/>es and <see cref="SlimeAppearanceObject"/>s</para>
+        /// <para>This is designed to be used for generating the bone weights and configuring the<br/>
+        /// <see cref="SlimeAppearanceObject"/>s for a custom slime model</para>
+        /// <para>Note: this only works for <see cref="SlimeAppearanceObject"/>s that use a <see cref="SkinnedMeshRenderer"/>.<br/>
+        /// <see cref="MeshFilter"/>s will not be affected</para>
+        /// </summary>
+        /// <param name="slimePrefab">the <see cref="SlimeAppearanceApplicator"/> from your slime prefab</param>
+        /// <param name="bodyApp">the <see cref="SlimeAppearanceObject"/> of your slime's main body</param>
+        /// <param name="jiggleAmount">the amount the model will be affected by the slime's movement</param>
+        /// <param name="scale">the scale to put the model to. This is handy due to model's scale being unaffected by <see cref="Transform.localScale"/></param>
         /// <param name="appearanceObjects">the additional <see cref="SlimeAppearanceObject"/>s that you want the weight data and configuration to be put on</param>
         public static void GenerateBoneData(SlimeAppearanceApplicator slimePrefab, SlimeAppearanceObject bodyApp, float jiggleAmount = 1, float scale = 1, params SlimeAppearanceObject[] appearanceObjects) => GenerateBoneData(slimePrefab, bodyApp, jiggleAmount, scale, null, appearanceObjects);
 
@@ -285,9 +337,17 @@ namespace AssetsLib
         {
             var objs = new List<SlimeAppearanceObject>();
             foreach (var s in appearance.Structures)
+            {
+                if (s == null)
+                    throw new NullReferenceException("One or more of the SlimeAppearanceStructures is null");
+                if (!s.Element)
+                    throw new NullReferenceException("One or more of the SlimeAppearanceElements is null");
+                if ( s.Element.Prefabs == null)
+                    throw new NullReferenceException("One or more of the SlimeAppearanceElement's prefab arrays are null");
                 foreach (var o in s.Element.Prefabs)
-                    if (o.GetComponent<Renderer>() is SkinnedMeshRenderer && !objs.Contains(o))
-                        objs.Add(o);
+                        if (o && o.GetComponent<Renderer>() is SkinnedMeshRenderer && !objs.Contains(o))
+                            objs.Add(o);
+            }
             if (objs.Count == 0)
                 throw new ArgumentException("The provided SlimeAppearance does not contain any SkinnedMeshRenderers", "appearance");
             var body = objs.First();
@@ -310,12 +370,21 @@ namespace AssetsLib
         /// <param name="appearanceObjects">the additional <see cref="SlimeAppearanceObject"/>s that you want the weight data and configuration to be put on</param>
         public static void GenerateBoneData(SlimeAppearanceApplicator slimePrefab, SlimeAppearanceObject bodyApp, float jiggleAmount = 1, float scale = 1, Mesh[] AdditionalMesh = null, params SlimeAppearanceObject[] appearanceObjects)
         {
+            if (!slimePrefab)
+                throw new ArgumentNullException("slimePrefab");
+            if (!bodyApp)
+                throw new ArgumentNullException("bodyApp");
             if (AdditionalMesh == null)
                 AdditionalMesh = new Mesh[0];
+            if (appearanceObjects == null)
+                appearanceObjects = new SlimeAppearanceObject[0];
             var mesh = bodyApp.GetComponent<SkinnedMeshRenderer>().sharedMesh;
             bodyApp.AttachedBones = new SlimeAppearance.SlimeBone[] { SlimeAppearance.SlimeBone.Slime, SlimeAppearance.SlimeBone.JiggleRight, SlimeAppearance.SlimeBone.JiggleLeft, SlimeAppearance.SlimeBone.JiggleTop, SlimeAppearance.SlimeBone.JiggleBottom, SlimeAppearance.SlimeBone.JiggleFront, SlimeAppearance.SlimeBone.JiggleBack };
             foreach (var a in appearanceObjects)
-                a.AttachedBones = bodyApp.AttachedBones;
+                if (a)
+                    a.AttachedBones = bodyApp.AttachedBones;
+                else
+                    throw new NullReferenceException("One or more of the SlimeAppearanceObjects are null");
             var v = mesh.vertices;
             var max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
             var min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
@@ -345,9 +414,16 @@ namespace AssetsLib
             foreach (var x in appearanceObjects)
                 if (x.GetComponent<SkinnedMeshRenderer>())
                     meshes.Add(x.GetComponent<SkinnedMeshRenderer>().sharedMesh);
+                else
+                    Debug.LogWarning("One of the SlimeAppearanceObjects provided to AssetsLib.MeshUtils.GenerateBoneData does not use a SkinnedMeshRenderer");
             meshes.AddRange(AdditionalMesh);
             foreach (var m in meshes)
             {
+                if (!m)
+                {
+                    Debug.LogWarning("One of the Meshes provided to AssetsLib.MeshUtils.GenerateBoneData is null");
+                    continue;
+                }
                 var v2 = m.vertices;
                 var b = new BoneWeight[v2.Length];
                 for (int i = 0; i < v2.Length; i++)
@@ -430,8 +506,15 @@ namespace AssetsLib
         /// <returns>Creates a readable copy of the Texture2D</returns>
         public static Texture2D GetReadable(this Texture2D source)
         {
-            Texture2D texture = new Texture2D(source.width, source.height, TextureFormat.RGBA32, source.mipmapCount, true);
-            Graphics.CopyTexture(source, texture);
+            RenderTexture temp = RenderTexture.GetTemporary(source.width, source.height, 0, RenderTextureFormat.Default, RenderTextureReadWrite.Linear);
+            Graphics.Blit(source, temp);
+            RenderTexture prev = RenderTexture.active;
+            RenderTexture.active = temp;
+            Texture2D texture = new Texture2D(source.width, source.height);
+            texture.ReadPixels(new Rect(0, 0, temp.width, temp.height), 0, 0);
+            texture.Apply();
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(temp);
             return texture;
         }
 
@@ -611,7 +694,7 @@ namespace AssetsLib
                 GameContext.Instance.MessageDirector.bundlesListeners -= onBundleChange;
                 onClose?.Invoke();
             };
-            //ui.transform.Find("MainPanel/CloseButton").GetComponent<Button>().onClick.AddListener(ui.Close);
+            ui.transform.Find("MainPanel/CloseButton").GetComponent<Button>().onClick.AddListener(ui.Close);
             var p = ui.transform.Find("MainPanel/MainBody/InventoryPanel/Content/InventoryGrid");
             foreach (var option in options) {
                 var e = Object.Instantiate(Main.buttonPrefab2, p, false);
@@ -635,6 +718,193 @@ namespace AssetsLib
             GameContext.Instance.MessageDirector.bundlesListeners += onBundleChange;
             return ui.gameObject;
         }
+
+        /// <summary>Creates a basic information UI</summary>
+        /// <param name="TitleImage">the image to display at the top of the UI</param>
+        /// <param name="Tabs">the tabs to put in the UI</param>
+        /// <param name="onClose">the code to be run when the UI is closed</param>
+        /// <param name="DefaultSelection">the item to have selected when the UI opens</param>
+        /// <returns>The <see cref="GameObject"/> of the opened ui</returns>
+        public static GameObject CreateInformationUI(Sprite TitleImage, IEnumerable<InformationTab> Tabs, Action onClose = null, InformationItem DefaultSelection = null)
+        {
+            var ui = Object.Instantiate(Main.uiPrefab3);
+            ui.uiHeader.sprite = TitleImage;
+            ui.onDestroy += () =>
+            {
+                onClose?.Invoke();
+            };
+            ui.SetItems(Tabs,DefaultSelection);
+            return ui.gameObject;
+        }
+    }
+    public class InformationUI : BaseUI
+    {
+        public RectTransform listingPanel;
+        public ScrollRect listingScroller;
+        public ScrollRect descScroller;
+        public TMP_Text titleText;
+        public TMP_Text introText;
+        public Image image;
+        public RectTransform descPanel;
+        public TMP_Text descTextPrefab;
+        public TabByMenuKeys tabs;
+        public SRToggle tabPrefab;
+        public Image uiHeader;
+        public Button closeButton;
+        Dictionary<InformationTab, (SRToggle, List<(InformationItem, Toggle)>)> tabItems = new Dictionary<InformationTab, (SRToggle, List<(InformationItem, Toggle)>)>();
+        public override void Awake()
+        {
+            base.Awake();
+            closeButton.onClick.AddListener(Close);
+        }
+        public void SetItems(IEnumerable<InformationTab> Items, InformationItem DefaultSelection = null)
+        {
+            InformationTab Selected = null;
+            var bundle = GameContext.Instance.MessageDirector.GetBundle("ui");
+            foreach (var t in tabItems)
+            {
+                Destroy(t.Value.Item1.gameObject);
+                foreach (var i in t.Value.Item2)
+                    Destroy(i.Item2.gameObject);
+            }
+            tabItems.Clear();
+            foreach(var t in Items)
+                if (t != null)
+            {
+                var toggle = Instantiate(tabPrefab, tabs.transform);
+                toggle.transform.Find("Text").GetComponent<TMP_Text>().text = bundle.Get(t.NameKey);
+                toggle.onValueChanged.AddListener(x =>
+                {
+                    if (x)
+                    {
+                        listingScroller.verticalNormalizedPosition = 1f;
+                        SelectTab(t);
+                    }
+                });
+                toggle.gameObject.SetActive(t.Available?.Invoke() ?? true);
+                var items = new List<(InformationItem, Toggle)>();
+                foreach (var i in t.Items)
+                    if (i != null)
+                {
+                    var item = Instantiate(SceneContext.Instance.PediaDirector.pediaListingPrefab, listingPanel);
+                    item.transform.Find("NameText").GetComponent<TMP_Text>().text = bundle.Get(i.TitleKey);
+                    item.transform.Find("Image").GetComponent<Image>().sprite = i.Icon;
+                    OnSelectDelegator.Create(item, () => SelectItem(t, i));
+                    if (DefaultSelection == i)
+                        Selected = t;
+                    items.Add((i, item.GetComponent<Toggle>()));
+                }
+                tabItems.Add(t, (toggle, items));
+            }
+            tabs.Awake();
+            if (Selected == null)
+                SelectTab(Items.First());
+            else
+                SelectItem(Selected, DefaultSelection);
+        }
+        public void SelectItem(InformationItem Item, bool LogFail = true)
+        {
+            var tab = tabItems.FirstOrDefault(x => x.Value.Item2.Exists(y => y.Item1 == Item));
+            if (tab.Key == null)
+            {
+                if (LogFail)
+                    Debug.LogWarning($"Could not find item {GameContext.Instance.MessageDirector.Get("ui", Item.TitleKey)} in the InformationUI");
+            }
+            else
+                SelectItem(tab.Key, Item);
+        }
+        public void SelectTab(InformationTab Tab) => SelectItem(Tab, Tab.Items[0]);
+        public void SelectItem(InformationTab Tab, InformationItem Item)
+        {
+            var bundle = GameContext.Instance.MessageDirector.GetBundle("ui");
+            foreach (var t in tabItems)
+            {
+                var flag = t.Key == Tab;
+                if (t.Value.Item1.isOn != flag)
+                    t.Value.Item1.isOn = flag;
+                foreach (var i in t.Value.Item2)
+                {
+                    var flag2 = flag && i.Item1 == Item;
+                    if (i.Item2.isOn != flag2)
+                    {
+                        i.Item2.isOn = flag2;
+                        if (flag2)
+                        {
+                            i.Item2.Select();
+                            titleText.text = bundle.Get(i.Item1.TitleKey);
+                            introText.text = bundle.Get(i.Item1.DescKey);
+                            image.sprite = i.Item1.Icon;
+                            descPanel.gameObject.SetActive(false);
+                            descPanel.gameObject.SetActive(true);
+                            foreach (Transform o in descPanel.GetAllChildren())
+                                DestroyImmediate(o.gameObject);
+                            foreach (var c in i.Item1.Contents)
+                                if (c != null)
+                                    CreateText(bundle.Get(c.TextKey,c.Params),c.FormatName).transform.SetParent(descPanel, false);
+                            descScroller.verticalNormalizedPosition = 1;
+                        }
+                    }
+                    var flag3 = flag && (i.Item1.Available?.Invoke() ?? true);
+                    if (i.Item2.gameObject.activeSelf != flag3)
+                        i.Item2.gameObject.SetActive(flag3);
+                }
+            }
+        }
+        public static GameObject CreateText(string Text, string Format)
+        {
+            var g = new GameObject("Text");
+            g.AddComponent<TextMeshProUGUI>().text = Text;
+            g.AddComponent<MeshTextStyler>().SetStyle(Format);
+            return g.gameObject;
+        }
+    }
+
+    /// <summary>For use with <seealso cref="UIUtils.CreateInformationUI(Sprite, IEnumerable{InformationTab}, Action, InformationItem)"/></summary>
+    public class InformationTab
+    {
+        public string NameKey;
+        public InformationItem[] Items;
+        public Func<bool> Available;
+        public InformationTab(string nameKey, InformationItem[] items)
+        {
+            NameKey = nameKey;
+            Items = items;
+        }
+    }
+
+    /// <summary>For use with <seealso cref="UIUtils.CreateInformationUI(Sprite, IEnumerable{InformationTab}, Action, InformationItem)"/></summary>
+    public class InformationItem
+    {
+        public string TitleKey;
+        public string DescKey;
+        public Sprite Icon;
+        public ContentItem[] Contents;
+        public Func<bool> Available;
+        public InformationItem(string titleKey, string descKey, Sprite icon, ContentItem[] contents)
+        {
+            TitleKey = titleKey;
+            DescKey = descKey;
+            Icon = icon;
+            Contents = contents;
+        }
+    }
+
+    /// <summary>For use with <seealso cref="UIUtils.CreateInformationUI(Sprite, IEnumerable{InformationTab}, Action, InformationItem)"/></summary>
+    public class ContentItem
+    {
+        public string TextKey;
+        public object[] Params;
+        public string FormatName;
+        public const string HeaderFormat = "LargeBold";
+        public const string DefaultFormat = "Default";
+        public ContentItem(string textKey, string formatName, params object[] parameters)
+        {
+            TextKey = textKey;
+            FormatName = formatName;
+            Params = parameters;
+        }
+        public static ContentItem CreateNormalItem(string textKey, params object[] parameters) => new ContentItem(textKey, DefaultFormat, parameters);
+        public static ContentItem CreateHeaderItem(string textKey, params object[] parameters) => new ContentItem(textKey, HeaderFormat, parameters);
     }
 
     public interface IInventoryItem
@@ -802,6 +1072,16 @@ namespace AssetsLib
             return e;
         }
 
+        public static SlimeAppearanceElement Clone(this SlimeAppearanceElement element, string name = null)
+        {
+            var e = ScriptableObject.CreateInstance<SlimeAppearanceElement>();
+            e.name = name ?? element.name;
+            e.Name = name ?? element.Name;
+            e.Prefabs = new SlimeAppearanceObject[element.Prefabs.Length];
+            element.Prefabs.CopyTo(e.Prefabs, 0);
+            return e;
+        }
+
         /// <returns>The <see cref="SlimeAppearance"/> of a slime given an <see cref="SlimeAppearance.AppearanceSaveSet"/></returns>
         public static SlimeAppearance GetAppearance(this Identifiable.Id id, SlimeAppearance.AppearanceSaveSet saveSet) => SceneContext.Instance.SlimeAppearanceDirector.SlimeDefinitions.GetSlimeByIdentifiableId(id).GetAppearanceForSet(saveSet);
 
@@ -847,6 +1127,16 @@ namespace AssetsLib
             var o = ScriptableObject.CreateInstance<T>();
             construct?.Invoke(o);
             return o;
+        }
+
+        /// <returns>Returns all the children of <paramref name="parent"/>. If <paramref name="includeInactive"/> is false, inactive children are excluded</returns>
+        public static List<Transform> GetAllChildren(this Transform parent, bool includeInactive = true)
+        {
+            var l = new List<Transform>();
+            foreach (Transform t in parent)
+                if (includeInactive || t.gameObject.activeSelf)
+                    l.Add(t);
+            return l;
         }
     }
 
@@ -1299,6 +1589,37 @@ namespace AssetsLib
             return false;
         }
 
+        /// <summary>Checks if type <paramref name="t"/> is the same as or inherits from type <typeparamref name="T"/></summary>
+        public static bool Is<T>(this Type t) => typeof(T).IsAssignableFrom(t);
+
+        public static List<T> GetAll<T>(this IEnumerable<T> c, Predicate<T> predicate, bool enforceUnique = false)
+        {
+            var l = new List<T>();
+            foreach (var i in c)
+                if (predicate(i))
+                {
+                    if (enforceUnique)
+                        l.AddUnique(i);
+                    else
+                        l.Add(i);
+                }
+            return l;
+        }
+        public static List<Y> Cast<X,Y>(this IEnumerable<X> c, Func<X,Y> converter)
+        {
+            var l = new List<Y>();
+            foreach (var i in c)
+                l.Add(converter(i));
+            return l;
+        }
+        public static List<Z> For<X,Y,Z>(this X o,Func<X,Y> start,Func<X,Y,bool> hasReachedEnd,Func<X,Y,Y> progress,Func<X,Y,Z> collector,Func<X,Y,bool> include = null)
+        {
+            var l = new List<Z>();
+            for (var i = start(o); !hasReachedEnd(o, i); i = progress(o, i))
+                if (include?.Invoke(o, i) ?? true)
+                    l.Add(collector(o, i));
+            return l;
+        }
     }
 
     /// <summary>A set of <see cref="Color"/>s that behaves similar to a spectrum or gradient</summary>
@@ -1459,12 +1780,12 @@ namespace AssetsLib
         /// <param name="triangles">All values must be indecies within the range of <paramref name="vertices"/> and the length must be a multiple of 3</param>
         public MeshData(IEnumerable<Vector3> vertices, IEnumerable<Vector2> uvs, IEnumerable<int> triangles)
         {
-            _v = vertices.ToList();
-            _u = uvs.ToList();
+            _v = vertices?.ToList() ?? new List<Vector3>();
+            _u = uvs?.ToList() ?? new List<Vector2>();
             var c = _v.Count;
             if (c != _u.Count)
                 throw new ArgumentException("vertices must be the same length as uvs", "uvs");
-            _t = triangles.ToList();
+            _t = triangles?.ToList() ?? new List<int>();
             if (_t.Count % 3 != 0)
                 throw new ArgumentException("triangles length must be a multiple of 3", "triangles");
             if (_t.Exists((x) => x >= c))
@@ -1501,6 +1822,12 @@ namespace AssetsLib
             for (int i = 0; i < _u.Count; i++)
                 _u[i] = modifier[_u[i]];
         }
+        /// <summary>Modifies the data set based on the rule provided by the <paramref name="modifier"/></summary>
+        public void Modify(Func<Vector3, Vector2, (Vector3, Vector2)> modifier)
+        {
+            for (int i = 0; i < _v.Count; i++)
+                (_v[i], _u[i]) = modifier(_v[i], _u[i]);
+        }
         /// <returns>A modified instance of the data set based on the rules provided by the <see cref="MeshModifier"/></returns>
         public static MeshData operator *(MeshData a, MeshModifier b)
         {
@@ -1510,6 +1837,15 @@ namespace AssetsLib
         }
         /// <returns>A modified instance of the data set based on the rules provided by the <see cref="MeshModifier"/></returns>
         public static MeshData operator *(MeshModifier a, MeshData b) => b * a;
+        /// <returns>A modified instance of the data set based on the rule provided</returns>
+        public static MeshData operator *(MeshData a, Func<Vector3, Vector2, (Vector3, Vector2)> b)
+        {
+            a = a.Clone();
+            a.Modify(b);
+            return a;
+        }
+        /// <returns>A modified instance of the data set based on the rule provided</returns>
+        public static MeshData operator *(Func<Vector3, Vector2, (Vector3, Vector2)> a, MeshData b) => b * a;
         public static implicit operator MeshData(Mesh m) => new MeshData(m.vertices, m.uv, m.triangles);
         public static implicit operator Mesh(MeshData m) => m.ToMesh();
         /// <returns>A <see cref="Mesh"/> generated from the data set</returns>
@@ -1524,6 +1860,27 @@ namespace AssetsLib
             m.RecalculateTangents();
             return m;
         }
+        public void RemoveWhere(Func<Vector3, Vector2, bool> predicate)
+        {
+            for (int i = 0; i < _v.Count - 1; i++)
+                    if (predicate(_v[i], _u[i]))
+                    {
+                        _u.RemoveAt(i);
+                        _v.RemoveAt(i);
+                    for (int k = _t.Count - 3; k >= 0; k -= 3)
+                        if (_t[k] == i || _t[k + 1] == i || _t[k + 2] == i)
+                            _t.RemoveRange(k, 3);
+                        else
+                        {
+                            if (_t[k] > i)
+                                _t[k]--;
+                            if (_t[k + 1] > i)
+                                _t[k + 1]--;
+                            if (_t[k + 2] > i)
+                                _t[k + 2]--;
+                        }
+                    }
+        }
         public void RemoveDuplicateVertices()
         {
             for (int i = 0; i < _v.Count - 1; i++)
@@ -1532,18 +1889,11 @@ namespace AssetsLib
                     {
                         _u.RemoveAt(j);
                         _v.RemoveAt(j);
-                        for (int k = _t.Count-3;k >= 0;k-=3)
-                            if (_t[k] == j || _t[k + 1] == j || _t[k + 2] == j)
-                                _t.RemoveRange(k, 3);
-                            else
-                            {
-                                if (_t[k] > j)
-                                    _t[k]--;
-                                if (_t[k + 1] > j)
-                                    _t[k + 1]--;
-                                if (_t[k + 2] > j)
-                                    _t[k + 2]--;
-                            }
+                        for (int k = 0;k < _t.Count; k++)
+                            if (_t[k] == j)
+                                _t[k] = i;
+                            else if (_t[k] > j)
+                                _t[k]--;
                     }
         }
     }
