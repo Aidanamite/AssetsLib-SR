@@ -1456,14 +1456,7 @@ namespace AssetsLib
         public static Vector2 Offset(this Vector2 value, Vector2 offset) => value + offset;
         /// <summary>Rotates a <see cref="Vector2"/> by the provided angle in degrees</summary>
         /// <returns>The rotated <see cref="Vector2"/></returns>
-        public static Vector2 Rotate(this Vector2 value, float angle)
-        {
-            var l = value.magnitude;
-            var a = Mathf.Atan2(value.x, value.y) + angle / 180 * Mathf.PI;
-            if (value.y < 0)
-                a += Mathf.PI;
-            return new Vector2(Mathf.Sin(a) * l, Mathf.Cos(a) * l);
-        }
+        public static Vector2 Rotate(this Vector2 value, float angle) => Quaternion.Euler(0, 0, angle) * value;
         /// <summary>Rotates a <see cref="Vector2"/> by the provided angle in degrees around the provided point</summary>
         /// <returns>The rotated <see cref="Vector2"/></returns>
         public static Vector2 Rotate(this Vector2 value, float angle, Vector2 rotatePoint) => value.Offset(-rotatePoint).Rotate(angle).Offset(rotatePoint);
