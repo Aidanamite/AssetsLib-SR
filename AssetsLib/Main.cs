@@ -1240,6 +1240,7 @@ namespace AssetsLib
             var originalSkybox = RenderSettings.skybox;
             var originalLight = RenderSettings.ambientLight;
             var originalLayers = new Dictionary<GameObject, int>();
+            var originalForceRenderingOff = new HashSet<Renderer>();
             try
             {
                 var o = go;
@@ -1287,23 +1288,28 @@ namespace AssetsLib
                         var max = Vector3.negativeInfinity;
                         var count = 0;
                         foreach (var rend in o.GetComponentsInChildren<Renderer>())
-                        {
-                            rend.forceRenderingOff = false;
-                            rend.gameObject.layer = renderLayer;
-                            if (config.respectParticleRendererBounds || !(rend is ParticleSystemRenderer))
+                            if (rend.enabled)
                             {
-                                count++;
-                                var b = rend.bounds;
-                                var v = b.min;
-                                min.x = Math.Min(min.x, v.x);
-                                min.y = Math.Min(min.y, v.y);
-                                min.z = Math.Min(min.z, v.z);
-                                v = b.max;
-                                max.x = Math.Max(max.x, v.x);
-                                max.y = Math.Max(max.y, v.y);
-                                max.z = Math.Max(max.z, v.z);
+                                if (!originalForceRenderingOff.Contains(rend) && rend.forceRenderingOff)
+                                {
+                                    rend.forceRenderingOff = false;
+                                    originalForceRenderingOff.Add(rend);
+                                }
+                                rend.gameObject.layer = renderLayer;
+                                if (config.respectParticleRendererBounds || !(rend is ParticleSystemRenderer))
+                                {
+                                    count++;
+                                    var b = rend.bounds;
+                                    var v = b.min;
+                                    min.x = Math.Min(min.x, v.x);
+                                    min.y = Math.Min(min.y, v.y);
+                                    min.z = Math.Min(min.z, v.z);
+                                    v = b.max;
+                                    max.x = Math.Max(max.x, v.x);
+                                    max.y = Math.Max(max.y, v.y);
+                                    max.z = Math.Max(max.z, v.z);
+                                }
                             }
-                        }
                         if (count == 0)
                             throw new InvalidOperationException("No bounds found on object");
                         var s = (float)Math.Ceiling(Math.Max((max - min).magnitude, (new Vector2(max.x, max.z) - new Vector2(min.x, min.z)).magnitude));
@@ -1376,6 +1382,9 @@ namespace AssetsLib
                 foreach (var p in originalLayers)
                     if (p.Key)
                         p.Key.layer = p.Value;
+                foreach (var r in originalForceRenderingOff)
+                    if (r)
+                        r.forceRenderingOff = true;
             }
             return results;
         }
