@@ -134,6 +134,10 @@
       <HintPath>D:\Steam\steamapps\common\Slime Rancher\SlimeRancher_Data\Managed\UnityEngine.JSONSerializeModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="UnityEngine.ParticleSystemModule">
+      <HintPath>D:\Steam\steamapps\common\Slime Rancher\SlimeRancher_Data\Managed\UnityEngine.ParticleSystemModule.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
     <Reference Include="UnityEngine.PhysicsModule">
       <HintPath>D:\Steam\steamapps\common\Slime Rancher\SlimeRancher_Data\Managed\UnityEngine.PhysicsModule.dll</HintPath>
       <Private>False</Private>
