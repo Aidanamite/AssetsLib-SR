@@ -1191,6 +1191,8 @@ namespace AssetsLib
             public bool linearImg = false;
             /// <summary>Not recommended unless you're using an object that is only particles or the particles you want to be included are not already included</summary>
             public bool respectParticleRendererBounds = false;
+            /// <summary>Whether to use a more detailed transparency detection. This will do more processing but will help if you're using a transparent background and are having issues with gamma artifacting in the render. This will have no effect if you're not using margins</summary>
+            public bool complexTransparencyDetection = false;
             public RenderConfig(uint width,uint height,Quaternion angle)
             {
                 imgWidth = width;
@@ -1199,6 +1201,7 @@ namespace AssetsLib
             }
         }
 
+        static Texture2D RenderImage(GameObject go, RenderConfig renderConfig, out Exception exception, bool copyObjectForRender, LightingMode lightingMode, int renderLayer) => go.RenderImage(renderConfig, out exception, copyObjectForRender, lightingMode, renderLayer); // Preventing MissingMethodException
         /// <summary>
         /// Renders an image of the object using the provided configuration.
         /// </summary>
@@ -1208,13 +1211,15 @@ namespace AssetsLib
         /// <param name="lightingMode">Which light sources should be included in the render</param>
         /// <param name="renderConfig">The configuration to use for rendering the image</param>
         /// <param name="renderLayer">The layer to use for the render. It is recommended to leave as 30 to avoid unwanted object being included in the image</param>
+        /// <param name="cameraBufferDistance">The amount of unrendered distance between the camera and the object. You shouldn't need to increase this unless you're getting strange object artifacting in the render</param>
         /// <returns><see langword="null"/> and sets the <paramref name="exception"/> value if an <see cref="Exception"/> occured, otherwise the generated image</returns>
-        public static Texture2D RenderImage(this GameObject go, RenderConfig renderConfig, out Exception exception, bool copyObjectForRender = true, LightingMode lightingMode = LightingMode.DoNotChange, int renderLayer = 30)
+        public static Texture2D RenderImage(this GameObject go, RenderConfig renderConfig, out Exception exception, bool copyObjectForRender = true, LightingMode lightingMode = LightingMode.DoNotChange, int renderLayer = 30, float cameraBufferDistance = 10)
         {
-            var r = go.RenderImages(new[] { renderConfig },out var exceptions, copyObjectForRender,lightingMode,renderLayer)[0];
+            var r = go.RenderImages(new[] { renderConfig },out var exceptions, copyObjectForRender,lightingMode,renderLayer,cameraBufferDistance)[0];
             exception = exceptions[0];
             return r;
         }
+        static Texture2D[] RenderImages(GameObject go, RenderConfig[] renderConfigs, out Exception[] exceptions, bool copyObjectForRender, LightingMode lightingMode, int renderLayer) => go.RenderImages(renderConfigs, out exceptions, copyObjectForRender, lightingMode, renderLayer); // Preventing MissingMethodException
         /// <summary>
         /// Renders multiple images of the object using the provided configurations.
         /// </summary>
@@ -1223,9 +1228,10 @@ namespace AssetsLib
         /// <param name="go">The object to render an image of</param>
         /// <param name="lightingMode">Which light sources should be included in the render</param>
         /// <param name="renderConfigs">The configurations to use for rendering the images</param>
-        /// <param name="renderLayer">The layer to use for the render. It is recommended to leave as 30 to avoid unwanted object being included in the image</param>
+        /// <param name="renderLayer">The layer to use for the renders. It is recommended to leave as 30 to avoid unwanted object being included in the images</param>
+        /// <param name="cameraBufferDistance">The amount of unrendered distance between the camera and the object. You shouldn't need to increase this unless you're getting strange object artifacting in the renders</param>
         /// <returns>An array of the same size as <paramref name="renderConfigs"/> containing the images generated, respective of the indecies. If an error occured while generating a particular image, a <see langword="null"/> will be stored at that index and the exception will be stored in <paramref name="exceptions"/> at said index</returns>
-        public static Texture2D[] RenderImages(this GameObject go, RenderConfig[] renderConfigs, out Exception[] exceptions, bool copyObjectForRender = true, LightingMode lightingMode = LightingMode.DoNotChange, int renderLayer = 30)
+        public static Texture2D[] RenderImages(this GameObject go, RenderConfig[] renderConfigs, out Exception[] exceptions, bool copyObjectForRender = true, LightingMode lightingMode = LightingMode.DoNotChange, int renderLayer = 30, float cameraBufferDistance = 10)
         {
             var results = new Texture2D[renderConfigs.Length];
             exceptions = new Exception[renderConfigs.Length];
@@ -1239,6 +1245,8 @@ namespace AssetsLib
             var originalLights = new List<Light>();
             var originalSkybox = RenderSettings.skybox;
             var originalLight = RenderSettings.ambientLight;
+            var originalFog = RenderSettings.fog;
+            RenderSettings.fog = false;
             var originalLayers = new Dictionary<GameObject, int>();
             var originalForceRenderingOff = new HashSet<Renderer>();
             try
@@ -1270,7 +1278,9 @@ namespace AssetsLib
                 c.orthographic = true;
                 c.cullingMask = 1 << renderLayer;
                 c.clearFlags = CameraClearFlags.SolidColor;
-                c.nearClipPlane = 0;
+                c.nearClipPlane = cameraBufferDistance;
+                c.useOcclusionCulling = false;
+                c.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.DepthNormals;
                 var ind = 0;
                 foreach (var config in renderConfigs)
                 {
@@ -1283,66 +1293,127 @@ namespace AssetsLib
                         var innerHeight = (int)(config.imageMargins != null ? config.imgHeight - config.imageMargins.Value.top - config.imageMargins.Value.bottom : config.imgHeight);
                         if (innerHeight <= 0 || innerWidth <= 0)
                             throw new InvalidOperationException($"Image is too small [Width={config.imgWidth},Height={config.imgHeight},WidthWithoutMargins={innerWidth},HeightWithoutMargins={innerHeight}]");
-                        //Before render call
                         var min = Vector3.positiveInfinity;
                         var max = Vector3.negativeInfinity;
                         var count = 0;
                         foreach (var rend in o.GetComponentsInChildren<Renderer>())
-                            if (rend.enabled)
+                        {
+                            if (!originalForceRenderingOff.Contains(rend) && rend.forceRenderingOff)
                             {
-                                if (!originalForceRenderingOff.Contains(rend) && rend.forceRenderingOff)
-                                {
-                                    rend.forceRenderingOff = false;
-                                    originalForceRenderingOff.Add(rend);
-                                }
-                                rend.gameObject.layer = renderLayer;
-                                if (config.respectParticleRendererBounds || !(rend is ParticleSystemRenderer))
-                                {
-                                    count++;
-                                    var b = rend.bounds;
-                                    var v = b.min;
-                                    min.x = Math.Min(min.x, v.x);
-                                    min.y = Math.Min(min.y, v.y);
-                                    min.z = Math.Min(min.z, v.z);
-                                    v = b.max;
-                                    max.x = Math.Max(max.x, v.x);
-                                    max.y = Math.Max(max.y, v.y);
-                                    max.z = Math.Max(max.z, v.z);
-                                }
+                                rend.forceRenderingOff = false;
+                                rend.enabled = true;
+                                originalForceRenderingOff.Add(rend);
                             }
+                            rend.gameObject.layer = renderLayer;
+                            if (config.respectParticleRendererBounds || !(rend is ParticleSystemRenderer))
+                            {
+                                count++;
+                                var b = rend.bounds;
+                                var v = b.min;
+                                min.x = Math.Min(min.x, v.x);
+                                min.y = Math.Min(min.y, v.y);
+                                min.z = Math.Min(min.z, v.z);
+                                v = b.max;
+                                max.x = Math.Max(max.x, v.x);
+                                max.y = Math.Max(max.y, v.y);
+                                max.z = Math.Max(max.z, v.z);
+                            }
+                        }
                         if (count == 0)
                             throw new InvalidOperationException("No bounds found on object");
-                        var s = (float)Math.Ceiling(Math.Max((max - min).magnitude, (new Vector2(max.x, max.z) - new Vector2(min.x, min.z)).magnitude));
+                        var offs = new[] { max / 2 - min / 2, min / 2 - max / 2, default, default, default, default, default, default };
+                        offs[2] = new Vector3(offs[0].x, offs[0].y, offs[1].z);
+                        offs[3] = new Vector3(offs[0].x, offs[1].y, offs[0].z);
+                        offs[4] = new Vector3(offs[0].x, offs[1].y, offs[1].z);
+                        offs[5] = new Vector3(offs[1].x, offs[0].y, offs[0].z);
+                        offs[6] = new Vector3(offs[1].x, offs[0].y, offs[1].z);
+                        offs[7] = new Vector3(offs[1].x, offs[1].y, offs[0].z);
+                        var size = Vector3.zero;
+                        foreach (var i in offs)
+                        {
+                            var v = Quaternion.Inverse(config.cameraAngle) * i * 2;
+                            size.x = Math.Max(size.x, Math.Abs(v.x));
+                            size.y = Math.Max(size.y, Math.Abs(v.y));
+                            size.z = Math.Max(size.z, Math.Abs(v.z));
+                        }
+                        c.aspect = (float)innerWidth / innerHeight;
+                        var s = (float)Math.Ceiling(Math.Max(size.x / c.aspect, size.y));
                         if (float.IsNaN(s) || float.IsInfinity(s))
                             throw new InvalidOperationException("Failed to detect valid object bounds");
                         RenderSettings.ambientLight = config.ambientLight ?? originalLight;
-                        c.backgroundColor = config.backgroundColor;
-                        c.aspect = (float)config.imgWidth / config.imgHeight;
                         var dir = config.cameraAngle * Vector3.forward;
-                        c.transform.position = ((max + min) / 2) + (-dir * s * 2);
+                        c.transform.position = ((max + min) / 2) + (-dir * (s * 2 + cameraBufferDistance));
                         c.transform.rotation = config.cameraAngle;
                         c.orthographicSize = s / 2;
-                        c.farClipPlane = s * 8;
+                        c.farClipPlane = s * 8 + cameraBufferDistance;
                         var r = RenderTexture.GetTemporary(innerWidth, innerHeight, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default);
                         c.pixelRect = new Rect(0, 0, r.width * 4, r.height * 4);
                         created.Add(r);
                         c.targetTexture = r;
-                        c.Render();
+                        var texture = new Texture2D((int)config.imgWidth, (int)config.imgHeight, TextureFormat.ARGB32, config.mipmapCount, config.linearImg);
+                        if (config.imageMargins != null && config.imageMargins != (0, 0, 0, 0))
+                        {
+                            var colors = new Color[texture.width * texture.height];
+                            for (int i = 0; i < colors.Length; i++)
+                                colors[i] = config.backgroundColor;
+                        }
                         var prev = RenderTexture.active;
                         RenderTexture.active = r;
-                        var texture = new Texture2D((int)config.imgWidth, (int)config.imgHeight, TextureFormat.ARGB32, config.mipmapCount,config.linearImg);
-                        texture.ReadPixels(new Rect(0, 0, r.width, r.height), (int)(config.imageMargins?.left ?? 0), (int)(config.imageMargins?.bottom ?? 0));
+                        if (config.imageMargins == null || !(config.complexTransparencyDetection && config.backgroundColor.a < 1))
+                        {
+                            c.backgroundColor = config.backgroundColor;
+                            c.Render();
+                            texture.ReadPixels(new Rect(0, 0, r.width, r.height), (int)(config.imageMargins?.left ?? 0), (int)(config.imageMargins?.bottom ?? 0));
+                        }
+                        else
+                        {
+                            c.backgroundColor = Color.red;
+                            c.Render();
+                            texture.ReadPixels(new Rect(0, 0, r.width, r.height), (int)(config.imageMargins?.left ?? 0), (int)(config.imageMargins?.bottom ?? 0));
+                            var red = texture.GetPixels(0);
+                            c.backgroundColor = Color.green;
+                            c.Render();
+                            texture.ReadPixels(new Rect(0, 0, r.width, r.height), (int)(config.imageMargins?.left ?? 0), (int)(config.imageMargins?.bottom ?? 0));
+                            var green = texture.GetPixels(0);
+                            for (int i = 0; i < red.Length; i++)
+                                red[i] = GetCommon(red[i], green[i]);
+                            if (config.imageMargins == null && config.backgroundColor.a > 0)
+                                for (int i = 0; i < red.Length; i++)
+                                    red[i] = config.backgroundColor.Overlay(red[i]);
+                            texture.SetPixels(red, 0);
+                        }
                         if (config.imageMargins != null)
                         {
-                            var edge = texture.FindEdges();
-                            if (edge.minX > config.imageMargins.Value.left && edge.minY > config.imageMargins.Value.bottom && edge.maxX < config.imgWidth - config.imageMargins.Value.right - 1 && edge.maxY < config.imgHeight - config.imageMargins.Value.top - 1)
+                            var edge = texture.FindEdges(config.complexTransparencyDetection ? Color.clear : config.backgroundColor, (int)config.imageMargins.Value.left, (int)config.imageMargins.Value.bottom, (int)config.imageMargins.Value.right, (int)config.imageMargins.Value.top);
+                            if ((edge.minX > config.imageMargins.Value.left || edge.maxX < config.imgWidth - config.imageMargins.Value.right - 1) && (edge.minY > config.imageMargins.Value.bottom || edge.maxY < config.imgHeight - config.imageMargins.Value.top - 1))
                             {
                                 var scale = Math.Max((edge.maxX - edge.minX + 1) / (float)r.width, (edge.maxY - edge.minY + 1) / (float)r.height);
                                 var off = new Vector2((edge.maxX - edge.minX + 1 - r.width) / 2f, r.height / 2);
                                 c.transform.position += c.transform.up * ((edge.maxY + edge.minY - r.height) / 2f / r.height * s) + c.transform.right * ((edge.maxX + edge.minX - r.width) / 2f / r.height * s);
                                 c.orthographicSize *= scale;
-                                c.Render();
-                                texture.ReadPixels(new Rect(0, 0, r.width, r.height), (int)(config.imageMargins?.left ?? 0), (int)(config.imageMargins?.bottom ?? 0));
+                                if (config.complexTransparencyDetection && config.backgroundColor.a < 1)
+                                {
+                                    c.backgroundColor = Color.red;
+                                    c.Render();
+                                    texture.ReadPixels(new Rect(0, 0, r.width, r.height), (int)(config.imageMargins?.left ?? 0), (int)(config.imageMargins?.bottom ?? 0));
+                                    var red = texture.GetPixels(0);
+                                    c.backgroundColor = Color.green;
+                                    c.Render();
+                                    texture.ReadPixels(new Rect(0, 0, r.width, r.height), (int)(config.imageMargins?.left ?? 0), (int)(config.imageMargins?.bottom ?? 0));
+                                    var green = texture.GetPixels(0);
+                                    for (int i = 0; i < red.Length; i++)
+                                        red[i] = GetCommon(red[i], green[i]);
+                                    if (config.backgroundColor.a > 0)
+                                        for (int i = 0; i < red.Length; i++)
+                                            red[i] = config.backgroundColor.Overlay(red[i]);
+                                    texture.SetPixels(red, 0);
+                                }
+                                else
+                                {
+                                    c.backgroundColor = config.backgroundColor;
+                                    c.Render();
+                                    texture.ReadPixels(new Rect(0, 0, r.width, r.height), (int)(config.imageMargins?.left ?? 0), (int)(config.imageMargins?.bottom ?? 0));
+                                }
                             }
                         }
                         texture.Apply();
@@ -1377,6 +1448,7 @@ namespace AssetsLib
                 Time.fixedDeltaTime = originalFixedTimeScale;
                 RenderSettings.skybox = originalSkybox;
                 RenderSettings.ambientLight = originalLight;
+                RenderSettings.fog = originalFog;
                 foreach (var l in originalLights)
                     l.enabled = true;
                 foreach (var p in originalLayers)
@@ -1387,6 +1459,16 @@ namespace AssetsLib
                         r.forceRenderingOff = true;
             }
             return results;
+        }
+
+        static Color GetCommon(Color r, Color g)
+        {
+            if (r == g)
+                return r;
+            if (r == Color.red && g == Color.green)
+                return Color.clear;
+            var a = 1 - r.r + g.r;
+            return new Color(g.r / a, r.g / a, r.b / a, a);
         }
     }
 
@@ -1863,15 +1945,15 @@ namespace AssetsLib
                     l.Add(collector(o, i));
             return l;
         }
-        internal static (int minX, int minY, int maxX, int maxY) FindEdges(this Texture2D texture)
+        internal static (int minX, int minY, int maxX, int maxY) FindEdges(this Texture2D texture, Color background, int startX = 0, int startY = 0, int endXOffset = 0, int endYOffset = 0)
         {
-            var x1 = texture.height - 1;
+            var x1 = texture.width - 1;
             var y1 = texture.height - 1;
             var x2 = 0;
             var y2 = 0;
-            for (int x = 0; x < texture.height; x++)
-                for (int y = 0; y < texture.width; y++)
-                    if (texture.GetPixel(x, y).a > 0)
+            for (int x = startX; x < texture.width - endXOffset; x++)
+                for (int y = startY; y < texture.height - endYOffset; y++)
+                    if (background.a == 0 ? texture.GetPixel(x, y).a != 0 : texture.GetPixel(x, y) != background)
                     {
                         x1 = Math.Min(x1, x);
                         x2 = Math.Max(x2, x);
