@@ -1375,8 +1375,12 @@ namespace AssetsLib
                             c.Render();
                             texture.ReadPixels(new Rect(0, 0, r.width, r.height), (int)(config.imageMargins?.left ?? 0), (int)(config.imageMargins?.bottom ?? 0));
                             var green = texture.GetPixels(0);
+                            c.backgroundColor = Color.blue;
+                            c.Render();
+                            texture.ReadPixels(new Rect(0, 0, r.width, r.height), (int)(config.imageMargins?.left ?? 0), (int)(config.imageMargins?.bottom ?? 0));
+                            var blue = texture.GetPixels(0);
                             for (int i = 0; i < red.Length; i++)
-                                red[i] = GetCommon(red[i], green[i]);
+                                red[i] = GetCommon(red[i], green[i], blue[i]);
                             if (config.imageMargins == null && config.backgroundColor.a > 0)
                                 for (int i = 0; i < red.Length; i++)
                                     red[i] = config.backgroundColor.Overlay(red[i]);
@@ -1401,8 +1405,12 @@ namespace AssetsLib
                                     c.Render();
                                     texture.ReadPixels(new Rect(0, 0, r.width, r.height), (int)(config.imageMargins?.left ?? 0), (int)(config.imageMargins?.bottom ?? 0));
                                     var green = texture.GetPixels(0);
+                                    c.backgroundColor = Color.blue;
+                                    c.Render();
+                                    texture.ReadPixels(new Rect(0, 0, r.width, r.height), (int)(config.imageMargins?.left ?? 0), (int)(config.imageMargins?.bottom ?? 0));
+                                    var blue = texture.GetPixels(0);
                                     for (int i = 0; i < red.Length; i++)
-                                        red[i] = GetCommon(red[i], green[i]);
+                                        red[i] = GetCommon(red[i], green[i], blue[i]);
                                     if (config.backgroundColor.a > 0)
                                         for (int i = 0; i < red.Length; i++)
                                             red[i] = config.backgroundColor.Overlay(red[i]);
@@ -1442,7 +1450,7 @@ namespace AssetsLib
                         if (i is RenderTexture r)
                             RenderTexture.ReleaseTemporary(r);
                         else
-                            Object.Destroy(i);
+                            Object.DestroyImmediate(i);
                     }
                 Time.timeScale = originalTimeScale;
                 Time.fixedDeltaTime = originalFixedTimeScale;
@@ -1461,14 +1469,17 @@ namespace AssetsLib
             return results;
         }
 
-        static Color GetCommon(Color r, Color g)
+        static Color GetCommon(Color r, Color g, Color b)
         {
             if (r == g)
                 return r;
             if (r == Color.red && g == Color.green)
                 return Color.clear;
-            var a = 1 - r.r + g.r;
-            return new Color(g.r / a, r.g / a, r.b / a, a);
+            var vr = Math.Max(g.r, b.r);
+            var vg = Math.Max(r.g, b.g);
+            var vb = Math.Max(r.b, g.b);
+            var a = Math.Max(Math.Max(1 - g.g + vg, 1 - r.r + vr), 1 - b.b + vb);
+            return new Color(vr / a, vg / a, vb / a, a);
         }
     }
 
