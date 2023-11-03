@@ -1149,8 +1149,8 @@ namespace AssetsLib
 
         /// <summary>
         /// Lighting options for the object rendering methods:<br/>
-        /// <see cref="RenderImage(GameObject, RenderConfig, out Exception, bool, LightingMode, int)"/><br/>
-        /// <see cref="RenderImages(GameObject, RenderConfig[], out Exception[], bool, LightingMode, int)"/>
+        /// <see cref="RenderImage(GameObject, RenderConfig, out Exception, bool, LightingMode, int, float)"/><br/>
+        /// <see cref="RenderImages(GameObject, RenderConfig[], out Exception[], bool, LightingMode, int, float)"/>
         /// </summary>
         public enum LightingMode
         {
@@ -1164,8 +1164,8 @@ namespace AssetsLib
 
         /// <summary>
         /// Image generation settings for the object rendering methods:<br/>
-        /// <see cref="RenderImage(GameObject, RenderConfig, out Exception, bool, LightingMode, int)"/><br/>
-        /// <see cref="RenderImages(GameObject, RenderConfig[], out Exception[], bool, LightingMode, int)"/>
+        /// <see cref="RenderImage(GameObject, RenderConfig, out Exception, bool, LightingMode, int, float)"/><br/>
+        /// <see cref="RenderImages(GameObject, RenderConfig[], out Exception[], bool, LightingMode, int, float)"/>
         /// </summary>
         public class RenderConfig
         {
