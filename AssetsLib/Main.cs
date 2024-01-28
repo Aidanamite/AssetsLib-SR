@@ -1188,11 +1188,30 @@ namespace AssetsLib
             /// <summary>Mipmap count of the image to be created</summary>
             public int mipmapCount = 0;
             /// <summary>Whether to use the linear color space or the sRGB color space for the image to be created</summary>
-            public bool linearImg = false;
+            public bool linearImg = QualitySettings.activeColorSpace == ColorSpace.Linear;
             /// <summary>Not recommended unless you're using an object that is only particles or the particles you want to be included are not already included</summary>
             public bool respectParticleRendererBounds = false;
             /// <summary>Whether to use a more detailed transparency detection. This will do more processing but will help if you're using a transparent background and are having issues with gamma artifacting in the render. This will have no effect if you're not using margins</summary>
             public bool complexTransparencyDetection = false;
+            /// <summary>If <see langword="null"/>, render height will be automatically calculated using object bounds, and will be adjusted to better fit margins if provided. Otherwise, the "height" of the area to be rendered</summary>
+            public float? renderHeightOverride;
+            /// <summary>If <see langword="null"/>, object center will be automatically calculated using object bounds, and will be adjusted to better fit margins if provided. Otherwise, the world-space point that is the center of the area to be rendered</summary>
+            public Vector3? centerOverride;
+            /// <summary>Sets the <see cref="DepthTextureMode"/> for the render to use. Leave <see langword="null"/> to use the current main camera's setting</summary>
+            public DepthTextureMode? depthModeOverride;
+            /// <summary>Sets whether the rendering camera should allow HDR for the render. Leave <see langword="null"/> to use the current main camera's setting</summary>
+            public bool? allowHDROverride;
+            /// <summary>Sets whether the rendering camera should allow HDR for the render. Leave <see langword="null"/> to use the current main camera's setting</summary>
+            public bool? allowMSAAOverride;
+            /// <summary>Sets the render camera's depth for the render. Leave <see langword="null"/> to use the current main camera's setting</summary>
+            public float? cameraDepthOverride;
+            /// <summary>Sets the <see cref="Camera.GateFitMode"/> for the render to use. Leave <see langword="null"/> to use the current main camera's setting</summary>
+            public Camera.GateFitMode? gateFitOverride;
+            /// <summary>
+            /// Image generation settings for the object rendering methods:<br/>
+            /// <see cref="RenderImage(GameObject, RenderConfig, out Exception, bool, LightingMode, int, float)"/><br/>
+            /// <see cref="RenderImages(GameObject, RenderConfig[], out Exception[], bool, LightingMode, int, float)"/>
+            /// </summary>
             public RenderConfig(uint width,uint height,Quaternion angle)
             {
                 imgWidth = width;
@@ -1280,7 +1299,11 @@ namespace AssetsLib
                 c.clearFlags = CameraClearFlags.SolidColor;
                 c.nearClipPlane = cameraBufferDistance;
                 c.useOcclusionCulling = false;
-                c.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.DepthNormals;
+                var depthTextureMode = Camera.main ? DepthTextureMode.Depth | DepthTextureMode.DepthNormals : Camera.main.depthTextureMode;
+                var allowHDR = Camera.main ? true : Camera.main.allowHDR;
+                var allowMSAA = Camera.main ? false : Camera.main.allowMSAA;
+                var depth = Camera.main ? c.depth : Camera.main.depth;
+                var gateFit = Camera.main ? Camera.GateFitMode.Horizontal : Camera.main.gateFit;
                 var ind = 0;
                 foreach (var config in renderConfigs)
                 {
@@ -1338,19 +1361,24 @@ namespace AssetsLib
                         }
                         c.aspect = (float)innerWidth / innerHeight;
                         var s = (float)Math.Ceiling(Math.Max(size.x / c.aspect, size.y));
-                        if (float.IsNaN(s) || float.IsInfinity(s))
+                        if (float.IsNaN(s) || float.IsInfinity(s) || s == 0)
                             throw new InvalidOperationException("Failed to detect valid object bounds");
                         RenderSettings.ambientLight = config.ambientLight ?? originalLight;
                         var dir = config.cameraAngle * Vector3.forward;
-                        c.transform.position = ((max + min) / 2) + (-dir * (s * 2 + cameraBufferDistance));
+                        c.transform.position = (config.centerOverride ?? ((max + min) / 2)) + (-dir * (s * 2 + cameraBufferDistance));
                         c.transform.rotation = config.cameraAngle;
-                        c.orthographicSize = s / 2;
+                        c.orthographicSize = (config.renderHeightOverride ?? s) / 2;
+                        c.depthTextureMode = config.depthModeOverride ?? depthTextureMode;
+                        c.allowHDR = config.allowHDROverride ?? allowHDR;
+                        c.allowMSAA = config.allowMSAAOverride ?? allowMSAA;
+                        c.depth = config.cameraDepthOverride ?? depth;
+                        c.gateFit = config.gateFitOverride ?? gateFit;
                         c.farClipPlane = s * 8 + cameraBufferDistance;
-                        var r = RenderTexture.GetTemporary(innerWidth, innerHeight, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default);
+                        var r = RenderTexture.GetTemporary(innerWidth, innerHeight, 0, RenderTextureFormat.ARGB32, config.linearImg ? RenderTextureReadWrite.Linear : RenderTextureReadWrite.sRGB);
                         c.pixelRect = new Rect(0, 0, r.width * 4, r.height * 4);
                         created.Add(r);
                         c.targetTexture = r;
-                        var texture = new Texture2D((int)config.imgWidth, (int)config.imgHeight, TextureFormat.ARGB32, config.mipmapCount, config.linearImg);
+                        var texture = new Texture2D((int)config.imgWidth, (int)config.imgHeight, TextureFormat.ARGB32, config.mipmapCount, !r.sRGB);
                         if (config.imageMargins != null && config.imageMargins != (0, 0, 0, 0))
                         {
                             var colors = new Color[texture.width * texture.height];
@@ -1386,14 +1414,23 @@ namespace AssetsLib
                                     red[i] = config.backgroundColor.Overlay(red[i]);
                             texture.SetPixels(red, 0);
                         }
-                        if (config.imageMargins != null)
+                        if (config.imageMargins != null && (config.renderHeightOverride == null || config.centerOverride == null))
                         {
                             var edge = texture.FindEdges(config.complexTransparencyDetection ? Color.clear : config.backgroundColor, (int)config.imageMargins.Value.left, (int)config.imageMargins.Value.bottom, (int)config.imageMargins.Value.right, (int)config.imageMargins.Value.top);
-                            if ((edge.minX > config.imageMargins.Value.left || edge.maxX < config.imgWidth - config.imageMargins.Value.right - 1) && (edge.minY > config.imageMargins.Value.bottom || edge.maxY < config.imgHeight - config.imageMargins.Value.top - 1))
+                            if (config.centerOverride == null 
+                                ? (edge.minX > config.imageMargins.Value.left || edge.maxX < config.imgWidth - config.imageMargins.Value.right - 1) && (edge.minY > config.imageMargins.Value.bottom || edge.maxY < config.imgHeight - config.imageMargins.Value.top - 1)
+                                : (edge.minX > config.imageMargins.Value.left && edge.maxX < config.imgWidth - config.imageMargins.Value.right - 1 && edge.minY > config.imageMargins.Value.bottom && edge.maxY < config.imgHeight - config.imageMargins.Value.top - 1))
                             {
-                                var scale = Math.Max((edge.maxX - edge.minX + 1) / (float)r.width, (edge.maxY - edge.minY + 1) / (float)r.height);
-                                var off = new Vector2((edge.maxX - edge.minX + 1 - r.width) / 2f, r.height / 2);
-                                c.transform.position += c.transform.up * ((edge.maxY + edge.minY - r.height) / 2f / r.height * s) + c.transform.right * ((edge.maxX + edge.minX - r.width) / 2f / r.height * s);
+                                var scale = config.renderHeightOverride == null
+                                    ? config.centerOverride == null
+                                        ? Math.Max((edge.maxX - edge.minX + 1) / (float)r.width, (edge.maxY - edge.minY + 1) / (float)r.height)
+                                        : (1 - Math.Min(Math.Min(edge.minX, r.width - edge.maxX) / r.width, Math.Min(edge.minY, r.height - edge.maxY) / r.height) * 2)
+                                    : 1;
+                                if (config.centerOverride == null)
+                                {
+                                    var off = new Vector2((edge.maxX - edge.minX + 1 - r.width) / 2f, r.height / 2);
+                                    c.transform.position += c.transform.up * ((edge.maxY + edge.minY - r.height) / 2f / r.height * s) + c.transform.right * ((edge.maxX + edge.minX - r.width) / 2f / r.height * s);
+                                }
                                 c.orthographicSize *= scale;
                                 if (config.complexTransparencyDetection && config.backgroundColor.a < 1)
                                 {
@@ -1424,7 +1461,7 @@ namespace AssetsLib
                                 }
                             }
                         }
-                        texture.Apply();
+                        texture.Apply(true);
                         RenderTexture.active = prev;
                         RenderTexture.ReleaseTemporary(r);
                         results[ind] = texture;
@@ -1971,7 +2008,7 @@ namespace AssetsLib
                         y1 = Math.Min(y1, y);
                         y2 = Math.Max(y2, y);
                     }
-            return (x1, y1, x2, y2);
+            return (x1 - startX, y1 - startY, x2 - startX, y2 - startY);
         }
     }
 

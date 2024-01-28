@@ -1,7 +1,8 @@
 {
   "id": "assetslib",
-  "name": "AssetsLib", 
-  "author": "Aidanamite", 
-  "description": "Adds various tools for doing assets related stuff", 
-  "version":  "1.2.6" 
+  "name": "AssetsLib",
+  "author": "Aidanamite",
+  "description": "Adds various tools for doing assets related stuff",
+  "version": "1.2.7",
+  "downloadlink": "https://www.nexusmods.com/slimerancher/mods/341"
 }
